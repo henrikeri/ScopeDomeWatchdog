@@ -4,6 +4,7 @@ using System.Net.NetworkInformation;
 using System.Threading;
 using System.Threading.Tasks;
 using ScopeDomeWatchdog.Core.Models;
+using ScopeDomeWatchdog.Core.Interop;
 
 namespace ScopeDomeWatchdog.Core.Services;
 
@@ -17,13 +18,24 @@ public sealed class WatchdogRunner : IDisposable
     private readonly object _triggerLock = new();
     private readonly CancellationTokenSource _cts = new();
     private Task? _loopTask;
+    private Task? _switchCacheTask;
     private DateTime _lastCycleUtc = DateTime.MinValue;
+    private DateTime _lastSwitchCacheUtc = DateTime.MinValue;
     private Func<CancellationToken, Task<bool>>? _restartHandler;
     private bool _isRunning = false;
     private INinaPluginService? _ninaService;
+    private SwitchStateCacheService? _switchCacheService;
+    private volatile bool _restartInProgress = false;
 
     public event Action<WatchdogStatus>? StatusUpdated;
     public event Action<bool>? RunningStateChanged;
+    public event Action<IReadOnlyList<CachedSwitchState>>? SwitchStatesCached;
+    public event Action<string>? LogMessage;
+
+    /// <summary>
+    /// True when a restart sequence is running - used to pause caching operations.
+    /// </summary>
+    public bool IsRestartInProgress => _restartInProgress;
 
     public WatchdogRunner(WatchdogConfig config, Func<CancellationToken, Task<bool>>? restartHandler = null, INinaPluginService? ninaService = null)
     {
@@ -33,6 +45,15 @@ public sealed class WatchdogRunner : IDisposable
         _triggerEvent = new EventWaitHandle(false, EventResetMode.ManualReset, _config.TriggerEventName);
     }
 
+    public void SetSwitchCacheService(SwitchStateCacheService service)
+    {
+        _switchCacheService = service;
+        _switchCacheService.LogMessage += msg => LogMessage?.Invoke(msg);
+        _switchCacheService.StatesCached += states => SwitchStatesCached?.Invoke(states);
+    }
+
+    public SwitchStateCacheService? GetSwitchCacheService() => _switchCacheService;
+
     public HealthMetricsTracker GetHealthMetrics => _metricsTracker;
 
     public void Start()
@@ -40,6 +61,7 @@ public sealed class WatchdogRunner : IDisposable
         if (_isRunning) return;
         _isRunning = true;
         _loopTask = Task.Run(LoopAsync);
+        _switchCacheTask = Task.Run(SwitchCacheLoopAsync);
         RunningStateChanged?.Invoke(true);
     }
 
@@ -49,7 +71,9 @@ public sealed class WatchdogRunner : IDisposable
         _isRunning = false;
         _cts.Cancel();
         _loopTask?.Wait(TimeSpan.FromSeconds(5));
+        _switchCacheTask?.Wait(TimeSpan.FromSeconds(5));
         _loopTask = null;
+        _switchCacheTask = null;
         RunningStateChanged?.Invoke(false);
     }
 
@@ -152,11 +176,18 @@ public sealed class WatchdogRunner : IDisposable
                 var success = false;
                 try
                 {
+                    _restartInProgress = true;
+                    LogMessage?.Invoke("Restart sequence starting - pausing cache operations");
                     success = await _restartHandler(_cts.Token);
                 }
                 catch
                 {
                     success = false;
+                }
+                finally
+                {
+                    _restartInProgress = false;
+                    LogMessage?.Invoke("Restart sequence complete - resuming cache operations");
                 }
 
                 _lastCycleUtc = DateTime.Now;
@@ -187,6 +218,54 @@ public sealed class WatchdogRunner : IDisposable
             catch (TaskCanceledException)
             {
                 break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Background loop that caches switch states periodically.
+    /// </summary>
+    private async Task SwitchCacheLoopAsync()
+    {
+        while (!_cts.IsCancellationRequested)
+        {
+            try
+            {
+                // Skip caching during restart
+                if (_restartInProgress)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(5), _cts.Token);
+                    continue;
+                }
+
+                var now = DateTime.UtcNow;
+                var elapsed = (now - _lastSwitchCacheUtc).TotalSeconds;
+                
+                if (_switchCacheService != null && 
+                    _config.MonitoredSwitches.Count > 0 &&
+                    !string.IsNullOrWhiteSpace(_config.AscomSwitchProgId) &&
+                    elapsed >= _config.SwitchCacheIntervalSec)
+                {
+                    LogMessage?.Invoke($"Caching switch states (interval: {_config.SwitchCacheIntervalSec}s)...");
+                    
+                    await _switchCacheService.ReadAndCacheStatesAsync(
+                        _config.AscomSwitchProgId,
+                        _config.MonitoredSwitches,
+                        _cts.Token);
+                    
+                    _lastSwitchCacheUtc = DateTime.UtcNow;
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(5), _cts.Token);
+            }
+            catch (TaskCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                LogMessage?.Invoke($"Error in switch cache loop: {ex.Message}");
+                await Task.Delay(TimeSpan.FromSeconds(10), _cts.Token);
             }
         }
     }

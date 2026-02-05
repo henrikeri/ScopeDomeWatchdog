@@ -24,8 +24,8 @@
                             <TextBlock Name="SwitchProgIdText" VerticalAlignment="Center" FontSize="12" MinWidth="200" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal">
-                            <Button Width="160" Margin="0,0,12,0" Content="Select Sub-Switch" Click="SelectSubSwitchButton_Click" />
-                            <TextBlock Name="SubSwitchText" VerticalAlignment="Center" />
+                            <Button Width="180" Margin="0,0,12,0" Content="Select Switches to Monitor" Click="SelectSubSwitchButton_Click" />
+                            <TextBlock Name="SubSwitchText" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="400" />
                         </StackPanel>
                     </StackPanel>
                 </Border>

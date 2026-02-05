@@ -1,0 +1,221 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:ScopeDomeWatchdog.Nina.Triggers"
+    xmlns:containers="clr-namespace:ScopeDomeWatchdog.Nina.Containers"
+    xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+    xmlns:behaviors="clr-namespace:NINA.Sequencer.Behaviors;assembly=NINA.Sequencer"
+    xmlns:ninactrl="clr-namespace:NINA.CustomControlLibrary;assembly=NINA.CustomControlLibrary"
+    xmlns:wpfutil="clr-namespace:NINA.WPF.Base.Utility;assembly=NINA.WPF.Base">
+    
+    <!-- DataTemplate for TriggerInstructionContainer - allows drag-drop of instructions -->
+    <DataTemplate DataType="{x:Type containers:TriggerInstructionContainer}">
+        <Border BorderBrush="{StaticResource BorderBrush}" 
+                BorderThickness="1" 
+                CornerRadius="3"
+                MinHeight="35"
+                MinWidth="200"
+                Padding="5"
+                Background="{StaticResource BackgroundBrush}"
+                AllowDrop="True">
+            <i:Interaction.Behaviors>
+                <behaviors:DragOverBehavior DragAboveSize="0" DragBelowSize="0" />
+                <behaviors:DropIntoBehavior 
+                    AllowedDragDropTypesString="NINA.Sequencer.Container.ISequenceContainer;NINA.Sequencer.SequenceItem.ISequenceItem;NINA.Sequencer.TemplatedSequenceContainer" 
+                    OnDropCommand="DropIntoCommand" />
+            </i:Interaction.Behaviors>
+            <Grid>
+                <ItemsControl ItemsSource="{Binding Items}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <ContentPresenter Content="{Binding}" Margin="0,2"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                
+                <!-- Placeholder text when empty -->
+                <TextBlock Text="Drop instructions here to run after reconnection"
+                           FontStyle="Italic"
+                           FontSize="10"
+                           Foreground="{StaticResource SecondaryBrush}"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Items.Count}" Value="0">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+        </Border>
+    </DataTemplate>
+    
+    <!-- Full DataTemplate for DomeReconnectionTrigger including header chrome -->
+    <DataTemplate DataType="{x:Type local:DomeReconnectionTrigger}">
+        <Border Background="{StaticResource SecondaryBackgroundBrush}" 
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0"
+                CornerRadius="0"
+                Margin="0,1">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                
+                <!-- Header Row - mimics NINA's trigger header -->
+                <Grid Grid.Row="0" Background="{StaticResource TertiaryBackgroundBrush}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <!-- Icon and Name -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="5,3">
+                        <!-- Static icon (shown when not reconnecting) -->
+                        <Path Data="{StaticResource RefreshSVG}" 
+                              Fill="{StaticResource ButtonForegroundBrush}"
+                              Stretch="Uniform"
+                              Width="14" Height="14"
+                              Margin="0,0,8,0"
+                              Visibility="{Binding IsReconnecting, Converter={StaticResource InverseBooleanToVisibilityCollapsedConverter}}"/>
+                        
+                        <!-- Circular progress indicator (shown when reconnecting) -->
+                        <Grid Width="14" Height="14" Margin="0,0,8,0"
+                              Visibility="{Binding IsReconnecting, Converter={StaticResource BooleanToVisibilityCollapsedConverter}}">
+                            <Ellipse Stroke="{StaticResource BorderBrush}" 
+                                     StrokeThickness="2" 
+                                     Opacity="0.3"/>
+                            <Path Stroke="{StaticResource ButtonForegroundBrush}"
+                                  StrokeThickness="2"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  RenderTransformOrigin="0.5,0.5">
+                                <Path.Data>
+                                    <PathGeometry>
+                                        <PathFigure StartPoint="7,1" IsClosed="False">
+                                            <ArcSegment Point="13,7" Size="6,6" SweepDirection="Clockwise"/>
+                                        </PathFigure>
+                                    </PathGeometry>
+                                </Path.Data>
+                                <Path.RenderTransform>
+                                    <RotateTransform/>
+                                </Path.RenderTransform>
+                                <Path.Style>
+                                    <Style TargetType="Path">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsReconnecting}" Value="True">
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation 
+                                                                Storyboard.TargetProperty="RenderTransform.Angle"
+                                                                From="0" To="360"
+                                                                Duration="0:0:1"
+                                                                RepeatBehavior="Forever"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Path.Style>
+                            </Path>
+                        </Grid>
+                        
+                        <TextBlock Text="{Binding Name}" 
+                                   VerticalAlignment="Center"
+                                   Foreground="{StaticResource PrimaryBrush}"/>
+                    </StackPanel>
+                    
+                    <!-- Custom content inline: Timeout setting -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="15,3,15,3" VerticalAlignment="Center">
+                        <TextBlock Text="Timeout:" 
+                                   VerticalAlignment="Center"
+                                   Foreground="{StaticResource PrimaryBrush}"
+                                   Margin="0,0,5,0"
+                                   FontSize="11"/>
+                        <TextBox Width="40" 
+                                 Text="{Binding TimeoutMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 VerticalAlignment="Center"
+                                 FontSize="11"
+                                 Padding="3,1"
+                                 ToolTip="Maximum time to wait for reconnection in minutes. Set to 0 for infinite wait."/>
+                        <TextBlock Text="min" 
+                                   VerticalAlignment="Center"
+                                   Foreground="{StaticResource PrimaryBrush}"
+                                   Margin="3,0,0,0"
+                                   FontSize="11"/>
+                    </StackPanel>
+                    
+                    <!-- Right side controls -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="5,3">
+                        <!-- Delete button -->
+                        <Button Command="{Binding DetachCommand}"
+                                Style="{StaticResource BackgroundButton}"
+                                ToolTip="Remove"
+                                Width="25" Height="25"
+                                Margin="2,0">
+                            <Path Data="{StaticResource TrashCanSVG}" 
+                                  Fill="{StaticResource ButtonForegroundBrush}"
+                                  Stretch="Uniform"
+                                  Width="12" Height="12"/>
+                        </Button>
+                        
+                        <!-- Enable/Disable toggle -->
+                        <ToggleButton IsChecked="{Binding IsEnabled, Converter={StaticResource InverseBooleanConverter}}"
+                                      Style="{StaticResource BackgroundToggleButton}"
+                                      ToolTip="Enable/Disable"
+                                      Width="25" Height="25"
+                                      Margin="2,0">
+                            <Path Fill="{StaticResource ButtonForegroundBrush}"
+                                  Stretch="Uniform"
+                                  Width="12" Height="12">
+                                <Path.Style>
+                                    <Style TargetType="Path">
+                                        <Setter Property="Data" Value="{StaticResource PowerSVG}"/>
+                                    </Style>
+                                </Path.Style>
+                            </Path>
+                        </ToggleButton>
+                        
+                        <!-- Menu button -->
+                        <Button Style="{StaticResource BackgroundButton}"
+                                ToolTip="Menu"
+                                Width="25" Height="25"
+                                Margin="2,0">
+                            <Button.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Clone" Command="{Binding CloneCommand}"/>
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                            <Path Data="{StaticResource DotsSVG}" 
+                                  Fill="{StaticResource ButtonForegroundBrush}"
+                                  Stretch="Uniform"
+                                  Width="12" Height="12"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+                
+                <!-- Content Row - Post-reconnection instructions -->
+                <StackPanel Grid.Row="1" Orientation="Vertical" Margin="5,5,5,5">
+                    <TextBlock Text="Post-Reconnection:" 
+                               FontWeight="SemiBold"
+                               FontSize="11"
+                               Foreground="{StaticResource PrimaryBrush}"
+                               Margin="0,0,0,3"/>
+                    
+                    <!-- Render the instructions container (uses its own DataTemplate) -->
+                    <ContentPresenter Content="{Binding Instructions}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </DataTemplate>
+    
+</ResourceDictionary>

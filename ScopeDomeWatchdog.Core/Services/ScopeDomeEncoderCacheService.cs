@@ -12,6 +12,7 @@ public sealed class ScopeDomeEncoderCacheService : IDisposable
     private readonly CancellationTokenSource _cts = new();
     private readonly object _sync = new();
     private Task? _loopTask;
+    private Func<bool>? _isRestartInProgress;
 
     /// <summary>Fires when encoder value is updated</summary>
     public event Action? EncoderUpdated;
@@ -20,6 +21,14 @@ public sealed class ScopeDomeEncoderCacheService : IDisposable
     {
         _config = config;
         _configPath = configPath;
+    }
+
+    /// <summary>
+    /// Sets a callback to check if a restart is in progress (to pause encoding caching).
+    /// </summary>
+    public void SetRestartCheckCallback(Func<bool> callback)
+    {
+        _isRestartInProgress = callback;
     }
 
     public void Start()
@@ -56,6 +65,12 @@ public sealed class ScopeDomeEncoderCacheService : IDisposable
             if (cancellationToken.IsCancellationRequested)
             {
                 break;
+            }
+
+            // Skip caching during restart
+            if (_isRestartInProgress?.Invoke() == true)
+            {
+                continue;
             }
 
             await ReadAndCacheOnceAsync(cancellationToken);

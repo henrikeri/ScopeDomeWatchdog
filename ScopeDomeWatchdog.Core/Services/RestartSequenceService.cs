@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -16,6 +17,7 @@ public sealed class RestartSequenceService : IDisposable
     private readonly StaTaskRunner _staRunner;
     private readonly RestartHistoryService _historyService;
     private readonly INinaPluginService? _ninaService;
+    private SwitchStateCacheService? _switchCacheService;
 
     public RestartSequenceService(WatchdogConfig config, string? configDirectory = null, INinaPluginService? ninaService = null)
     {
@@ -24,6 +26,11 @@ public sealed class RestartSequenceService : IDisposable
         var historyDir = configDirectory ?? ConfigService.GetDefaultConfigDirectory();
         _historyService = new RestartHistoryService(historyDir);
         _ninaService = ninaService;
+    }
+
+    public void SetSwitchCacheService(SwitchStateCacheService service)
+    {
+        _switchCacheService = service;
     }
 
     public RestartHistoryService GetHistoryService => _historyService;
@@ -207,7 +214,21 @@ public sealed class RestartSequenceService : IDisposable
                 var sw = ConnectAscomObject(_config.AscomSwitchProgId, _config.AscomSwitchConnectTimeoutSec, _config.AscomSwitchConnectRetrySec, logWriter);
                 try
                 {
-                    EnsureFanOn(sw, _config.FanSwitchIndex, _config.FanEnsureTimeoutSec, logWriter);
+                    // Restore cached switch states if available
+                    var cachedStates = _switchCacheService?.GetCachedStates();
+                    if (cachedStates != null && cachedStates.Count > 0)
+                    {
+                        Log(logWriter, $"Restoring {cachedStates.Count} cached switch states...");
+                        RestoreCachedSwitchStates(sw, cachedStates, logWriter);
+                    }
+                    else
+                    {
+                        // Fallback to legacy single switch behavior
+#pragma warning disable CS0618 // Type or member is obsolete
+                        Log(logWriter, $"No cached states, using legacy FanSwitch index {_config.FanSwitchIndex}");
+                        EnsureFanOn(sw, _config.FanSwitchIndex, _config.FanEnsureTimeoutSec, logWriter);
+#pragma warning restore CS0618
+                    }
                 }
                 finally
                 {
@@ -429,6 +450,78 @@ public sealed class RestartSequenceService : IDisposable
                 }
 
                 Thread.Sleep(TimeSpan.FromSeconds(2));
+            }
+        }
+    }
+
+    private void RestoreCachedSwitchStates(object swObj, IReadOnlyList<CachedSwitchState> states, RestartLogWriter logWriter)
+    {
+        foreach (var cached in states)
+        {
+            try
+            {
+                bool setOk = false;
+                
+                // First check if we can write to this switch
+                bool canWrite = true;
+                try
+                {
+                    canWrite = (bool)swObj.GetType().InvokeMember("CanWrite", 
+                        System.Reflection.BindingFlags.InvokeMethod, null, swObj, new object[] { cached.Index });
+                }
+                catch
+                {
+                    // Assume we can write if CanWrite fails
+                }
+
+                if (!canWrite)
+                {
+                    Log(logWriter, $"Switch {cached.Index} ({cached.Name}): CanWrite=false, skipping");
+                    continue;
+                }
+
+                // Try to restore using SetSwitch first
+                if (cached.State.HasValue)
+                {
+                    try
+                    {
+                        swObj.GetType().InvokeMember("SetSwitch", 
+                            System.Reflection.BindingFlags.InvokeMethod, null, swObj, 
+                            new object[] { cached.Index, cached.State.Value });
+                        setOk = true;
+                        Log(logWriter, $"Restored switch {cached.Index} ({cached.Name}) State={cached.State.Value}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Log(logWriter, $"SetSwitch({cached.Index}, {cached.State.Value}) failed: {ex.Message}");
+                    }
+                }
+
+                // If SetSwitch failed and we have a value, try SetSwitchValue
+                if (!setOk && cached.Value.HasValue)
+                {
+                    try
+                    {
+                        swObj.GetType().InvokeMember("SetSwitchValue", 
+                            System.Reflection.BindingFlags.InvokeMethod, null, swObj, 
+                            new object[] { cached.Index, cached.Value.Value });
+                        setOk = true;
+                        Log(logWriter, $"Restored switch {cached.Index} ({cached.Name}) Value={cached.Value.Value}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Log(logWriter, $"SetSwitchValue({cached.Index}, {cached.Value.Value}) failed: {ex.Message}");
+                    }
+                }
+
+                if (!setOk)
+                {
+                    Log(logWriter, $"Warning: Failed to restore switch {cached.Index} ({cached.Name})");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log(logWriter, $"Error restoring switch {cached.Index}: {ex.Message}");
             }
         }
     }

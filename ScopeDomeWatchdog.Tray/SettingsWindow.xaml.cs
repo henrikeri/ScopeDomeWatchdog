@@ -139,10 +139,20 @@ public partial class SettingsWindow : Window
     {
         DomeProgIdText.Text = _config?.AscomDomeProgId ?? "(none)";
         SwitchProgIdText.Text = _config?.AscomSwitchProgId ?? "(none)";
-        var fanLabel = string.IsNullOrWhiteSpace(_config?.FanSwitchName) 
-            ? $"{_config?.FanSwitchIndex}" 
-            : $"{_config?.FanSwitchIndex} ({_config.FanSwitchName})";
-        SubSwitchText.Text = fanLabel;
+        
+        // Display monitored switches
+        if (_config?.MonitoredSwitches != null && _config.MonitoredSwitches.Count > 0)
+        {
+            var labels = _config.MonitoredSwitches
+                .Select(s => string.IsNullOrWhiteSpace(s.Name) ? $"#{s.Index}" : $"#{s.Index} ({s.Name})")
+                .ToList();
+            SubSwitchText.Text = string.Join(", ", labels);
+        }
+        else
+        {
+            SubSwitchText.Text = "(none selected)";
+        }
+        
         var shellyLabel = $"ID {_config?.SwitchId}";
         ShellyRelayText.Text = shellyLabel;
     }
@@ -206,14 +216,14 @@ public partial class SettingsWindow : Window
         try
         {
             var switches = await _switchEnumerator.GetSwitchesAsync(_config.AscomSwitchProgId, CancellationToken.None);
-            var window = new SelectSwitchWindow(switches);
+            var window = new SelectSwitchWindow(switches, _config.MonitoredSwitches);
             window.Owner = this;
-            if (window.ShowDialog() == true && window.SelectedSwitch != null)
+            if (window.ShowDialog() == true)
             {
                 if (_config != null)
                 {
-                    _config.FanSwitchIndex = window.SelectedSwitch.Index;
-                    _config.FanSwitchName = window.SelectedSwitch.Name;
+                    _config.MonitoredSwitches.Clear();
+                    _config.MonitoredSwitches.AddRange(window.SelectedSwitches);
                     UpdateAscomTexts();
                 }
             }

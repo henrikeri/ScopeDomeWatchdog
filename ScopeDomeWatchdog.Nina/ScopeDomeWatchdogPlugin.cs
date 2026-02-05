@@ -5,6 +5,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Windows;
+using System.Windows.Input;
+using Microsoft.Win32;
 using NINA.Core.Utility;
 using NINA.Plugin;
 using NINA.Plugin.Interfaces;
@@ -19,12 +22,71 @@ namespace ScopeDomeWatchdog.Nina {
     public class ScopeDomeWatchdogPlugin : PluginBase, INotifyPropertyChanged {
         
         private string _trayAppPath = string.Empty;
+        private ResourceDictionary? _resources;
+        private ResourceDictionary? _optionsResources;
 
         [ImportingConstructor]
         public ScopeDomeWatchdogPlugin() {
             // Try to auto-detect common tray app locations
             _trayAppPath = DetectTrayAppPath();
+            
+            // Initialize commands
+            BrowseTrayAppCommand = new RelayCommand(BrowseTrayApp);
+            LaunchTrayAppCommand = new RelayCommand(LaunchTrayApp);
+            RefreshStatusCommand = new RelayCommand(RefreshStatus);
+            
+            // Load XAML resources
+            LoadResources();
         }
+        
+        private void LoadResources() {
+            try {
+                _resources = new ResourceDictionary {
+                    Source = new Uri("pack://application:,,,/ScopeDomeWatchdog.Nina;component/Views/DomeReconnectionTriggerTemplate.xaml")
+                };
+                Application.Current.Resources.MergedDictionaries.Add(_resources);
+                Logger.Info("[ScopeDomeWatchdog] Loaded trigger template resources");
+                
+                _optionsResources = new ResourceDictionary {
+                    Source = new Uri("pack://application:,,,/ScopeDomeWatchdog.Nina;component/Views/Options.xaml")
+                };
+                Application.Current.Resources.MergedDictionaries.Add(_optionsResources);
+                Logger.Info("[ScopeDomeWatchdog] Loaded options resources");
+            }
+            catch (Exception ex) {
+                Logger.Error($"[ScopeDomeWatchdog] Failed to load resources: {ex.Message}");
+            }
+        }
+
+        #region Commands
+        
+        public ICommand BrowseTrayAppCommand { get; }
+        public ICommand LaunchTrayAppCommand { get; }
+        public ICommand RefreshStatusCommand { get; }
+        
+        private void BrowseTrayApp(object? parameter) {
+            var dialog = new OpenFileDialog {
+                Filter = "Executable files (*.exe)|*.exe|All files (*.*)|*.*",
+                Title = "Select ScopeDomeWatchdog.Tray.exe",
+                FileName = "ScopeDomeWatchdog.Tray.exe"
+            };
+            
+            if (!string.IsNullOrWhiteSpace(TrayAppPath) && File.Exists(TrayAppPath)) {
+                dialog.InitialDirectory = Path.GetDirectoryName(TrayAppPath);
+            }
+            
+            if (dialog.ShowDialog() == true) {
+                TrayAppPath = dialog.FileName;
+                Logger.Info($"[ScopeDomeWatchdog] Tray app path set to: {TrayAppPath}");
+            }
+        }
+        
+        private void RefreshStatus(object? parameter) {
+            // Force property change notification to update UI
+            RaisePropertyChanged(nameof(IsTrayAppRunning));
+        }
+        
+        #endregion
 
         /// <summary>
         /// Path to the ScopeDome Watchdog Tray application executable.
@@ -69,13 +131,14 @@ namespace ScopeDomeWatchdog.Nina {
         /// <summary>
         /// Launches the tray application if it's not already running.
         /// </summary>
-        public void LaunchTrayApp()
+        public void LaunchTrayApp(object? parameter = null)
         {
             try
             {
                 if (IsTrayAppRunning)
                 {
                     Logger.Info("[ScopeDomeWatchdog] Tray app is already running");
+                    RaisePropertyChanged(nameof(IsTrayAppRunning));
                     return;
                 }
 
@@ -91,6 +154,11 @@ namespace ScopeDomeWatchdog.Nina {
                     FileName = TrayAppPath,
                     UseShellExecute = true,
                     WorkingDirectory = Path.GetDirectoryName(TrayAppPath)
+                });
+                
+                // Refresh status after a short delay
+                System.Threading.Tasks.Task.Delay(1000).ContinueWith(_ => {
+                    Application.Current?.Dispatcher?.Invoke(() => RaisePropertyChanged(nameof(IsTrayAppRunning)));
                 });
             }
             catch (Exception ex)

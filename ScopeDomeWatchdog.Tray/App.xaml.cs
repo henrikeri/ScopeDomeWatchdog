@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Windows;
 using WpfApplication = System.Windows.Application;
+using ScopeDomeWatchdog.Core.Interop;
 using ScopeDomeWatchdog.Core.Models;
 using ScopeDomeWatchdog.Core.Services;
 using ScopeDomeWatchdog.Tray.Services;
@@ -20,6 +21,8 @@ public partial class App : WpfApplication
 	private RestartSequenceService? _restartService;
 	private ScopeDomeEncoderCacheService? _encoderCacheService;
 	private NinaPluginService? _ninaService;
+	private SwitchStateCacheService? _switchCacheService;
+	private StaTaskRunner? _switchStaRunner;
 
 	protected override void OnStartup(StartupEventArgs e)
 	{
@@ -35,9 +38,18 @@ public partial class App : WpfApplication
 		// Initialize Nina plugin service for sequencer integration
 		_ninaService = new NinaPluginService();
 		
+		// Initialize switch state caching service
+		_switchStaRunner = new StaTaskRunner("StaSwitchCache");
+		_switchCacheService = new SwitchStateCacheService(_switchStaRunner);
+		
 		_restartService = new RestartSequenceService(_config, configDir, _ninaService);
+		_restartService.SetSwitchCacheService(_switchCacheService);
+		
 		_runner = new WatchdogRunner(_config, ct => _restartService.ExecuteAsync(ct), _ninaService);
+		_runner.SetSwitchCacheService(_switchCacheService);
+		
 		_encoderCacheService = new ScopeDomeEncoderCacheService(_config, _configPath);
+		_encoderCacheService.SetRestartCheckCallback(() => _runner?.IsRestartInProgress ?? false);
 		_encoderCacheService.Start();
         
 		_mainWindow = new MainWindow(_runner, _config, _configPath, _restartService, _ => _encoderCacheService?.RequestImmediateRefresh());
@@ -85,6 +97,7 @@ public partial class App : WpfApplication
 		_restartService?.Dispose();
 		_ninaService?.Dispose();
 		_runner?.Dispose();
+		_switchStaRunner?.Dispose();
 
 		Shutdown();
 	}

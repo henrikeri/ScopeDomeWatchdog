@@ -27,8 +27,8 @@ using System.Runtime.InteropServices;
 //      Build Number
 //      Revision
 //
-[assembly: AssemblyVersion("0.1.0.0")]
-[assembly: AssemblyFileVersion("0.1.0.0")]
+[assembly: AssemblyVersion("0.2.0.0")]
+[assembly: AssemblyFileVersion("0.2.0.0")]
 
 // NINA Plugin Metadata (REQUIRED for plugin discovery)
 [assembly: AssemblyMetadata("MinimumApplicationVersion", "3.0.0.1001")]

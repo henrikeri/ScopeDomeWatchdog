@@ -49,6 +49,7 @@ public partial class MainWindow : Window
 
         _runner.StatusUpdated += status => Dispatcher.Invoke(() => UpdateStatus(status));
         _runner.RunningStateChanged += isRunning => Dispatcher.Invoke(() => UpdateRunningState(isRunning));
+        _runner.SwitchStatesCached += states => Dispatcher.Invoke(() => UpdateSwitchCacheDisplay(states));
         UpdateRunningState(_runner.IsRunning);
 
         // Initialize live log viewer
@@ -114,7 +115,12 @@ public partial class MainWindow : Window
         _config.FindHomeTimeoutSec = refreshed.FindHomeTimeoutSec;
         _config.FindHomePollMs = refreshed.FindHomePollMs;
         _config.AscomSwitchProgId = refreshed.AscomSwitchProgId;
+        _config.MonitoredSwitches.Clear();
+        _config.MonitoredSwitches.AddRange(refreshed.MonitoredSwitches);
+        _config.SwitchCacheIntervalSec = refreshed.SwitchCacheIntervalSec;
+#pragma warning disable CS0618 // Type or member is obsolete
         _config.FanSwitchIndex = refreshed.FanSwitchIndex;
+#pragma warning restore CS0618
         _config.AscomSwitchConnectTimeoutSec = refreshed.AscomSwitchConnectTimeoutSec;
         _config.AscomSwitchConnectRetrySec = refreshed.AscomSwitchConnectRetrySec;
         _config.FanEnsureTimeoutSec = refreshed.FanEnsureTimeoutSec;
@@ -123,7 +129,9 @@ public partial class MainWindow : Window
         _config.HttpTimeoutSec = refreshed.HttpTimeoutSec;
         _config.RestartLogDirectory = refreshed.RestartLogDirectory;
         _config.StartMinimizedToTray = refreshed.StartMinimizedToTray;
+#pragma warning disable CS0618 // Type or member is obsolete
         _config.FanSwitchName = refreshed.FanSwitchName;
+#pragma warning restore CS0618
         _config.DomeHttpIp = refreshed.DomeHttpIp;
         _config.DomeHttpUsername = refreshed.DomeHttpUsername;
         _config.DomeHttpPassword = refreshed.DomeHttpPassword;
@@ -144,8 +152,10 @@ public partial class MainWindow : Window
 
     private void UpdateConfigSummary()
     {
-        var fanLabel = string.IsNullOrWhiteSpace(_config.FanSwitchName) ? $"{_config.FanSwitchIndex}" : $"{_config.FanSwitchIndex} ({_config.FanSwitchName})";
-        ConfigText.Text = $"Monitor IP: {_config.MonitorIp} | Shelly IP: {_config.PlugIp} | Dome ProgID: {_config.AscomDomeProgId} | Switch ProgID: {_config.AscomSwitchProgId} | Fan Index: {fanLabel} | Home Action: {_config.HomeActionMode}";
+        var switchesLabel = _config.MonitoredSwitches.Count > 0 
+            ? $"{_config.MonitoredSwitches.Count} switches" 
+            : "none";
+        ConfigText.Text = $"Monitor IP: {_config.MonitorIp} | Shelly IP: {_config.PlugIp} | Dome ProgID: {_config.AscomDomeProgId} | Switch ProgID: {_config.AscomSwitchProgId} | Monitored: {switchesLabel} | Home Action: {_config.HomeActionMode}";
     }
 
     private void UpdateStatus(WatchdogStatus status)
@@ -364,5 +374,17 @@ public partial class MainWindow : Window
         {
             WpfMessageBox.Show(this, $"Failed to clear log: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+
+    private void UpdateSwitchCacheDisplay(IReadOnlyList<ScopeDomeWatchdog.Core.Services.CachedSwitchState> states)
+    {
+        if (states == null || states.Count == 0)
+        {
+            SwitchCacheText.Text = "Switch Cache: n/a";
+            return;
+        }
+
+        var stateStrings = states.Select(s => $"{s.Name}: {(s.State == true ? "ON" : s.State == false ? "OFF" : "?")}");
+        SwitchCacheText.Text = $"Switches: {string.Join(" | ", stateStrings)}";
     }
 }

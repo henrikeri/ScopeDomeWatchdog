@@ -1,6 +1,16 @@
 using System;
+using System.Collections.Generic;
 
 namespace ScopeDomeWatchdog.Core.Models;
+
+/// <summary>
+/// Represents a switch that is monitored and whose state will be cached/restored.
+/// </summary>
+public sealed class MonitoredSwitch
+{
+    public int Index { get; set; }
+    public string Name { get; set; } = string.Empty;
+}
 
 public sealed class WatchdogConfig
 {
@@ -31,7 +41,20 @@ public sealed class WatchdogConfig
     public int FindHomePollMs { get; set; } = 500;
 
     public string AscomSwitchProgId { get; set; } = "ASCOM.ScopeDomeUSBDome.DomeLS.Switch";
+    
+    /// <summary>
+    /// List of switches to monitor and restore after reconnection.
+    /// </summary>
+    public List<MonitoredSwitch> MonitoredSwitches { get; set; } = new();
+    
+    /// <summary>
+    /// How often to read and cache switch states (in seconds).
+    /// </summary>
+    public int SwitchCacheIntervalSec { get; set; } = 30;
+    
+    [Obsolete("Use MonitoredSwitches instead")]
     public int FanSwitchIndex { get; set; } = 18;
+    [Obsolete("Use MonitoredSwitches instead")]
     public string? FanSwitchName { get; set; }
     public int AscomSwitchConnectTimeoutSec { get; set; } = 60;
     public int AscomSwitchConnectRetrySec { get; set; } = 3;

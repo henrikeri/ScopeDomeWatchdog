@@ -1,7 +1,7 @@
 #region "copyright"
 /*
     ScopeDome Watchdog NINA Plugin
-    Copyright (c) 2026 henrikeri
+    Copyright (c) 2026 Henrik Erevik Riise
     
     This Source Code Form is subject to the terms of the Mozilla Public
     License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -13,6 +13,7 @@
 */
 #endregion "copyright"
 
+using Newtonsoft.Json;
 using NINA.Core.Enum;
 using NINA.Core.Model;
 using NINA.Core.Utility;
@@ -24,10 +25,12 @@ using NINA.Sequencer.SequenceItem;
 using NINA.Sequencer.Trigger;
 using NINA.Sequencer.Utility;
 using NINA.WPF.Base.Interfaces.Mediator;
+using ScopeDomeWatchdog.Nina.Containers;
 using System;
 using System.ComponentModel;
 using System.ComponentModel.Composition;
 using System.IO;
+using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -38,6 +41,7 @@ namespace ScopeDomeWatchdog.Nina.Triggers
     [ExportMetadata("Icon", "RefreshSVG")]
     [ExportMetadata("Category", "ScopeDome Watchdog")]
     [Export(typeof(ISequenceTrigger))]
+    [JsonObject(MemberSerialization.OptIn)]
     public class DomeReconnectionTrigger : SequenceTrigger
     {
         // Named events for cross-process communication
@@ -69,10 +73,7 @@ namespace ScopeDomeWatchdog.Nina.Triggers
         /// Maximum time to wait for reconnection before failing gracefully (in minutes).
         /// Set to 0 to wait indefinitely.
         /// </summary>
-        [Category("Reconnection")]
-        [DisplayName("Timeout (minutes)")]
-        [Description("Maximum time to wait for dome reconnection before failing gracefully. Set to 0 to wait indefinitely.")]
-        [DefaultValue(10)]
+        [JsonProperty]
         public int TimeoutMinutes
         {
             get => _timeoutMinutes;
@@ -81,10 +82,50 @@ namespace ScopeDomeWatchdog.Nina.Triggers
                 if (_timeoutMinutes != value)
                 {
                     _timeoutMinutes = value;
-                    base.RaisePropertyChanged();
+                    RaisePropertyChanged();
                 }
             }
         }
+
+        /// <summary>
+        /// Indicates whether a reconnection is currently in progress.
+        /// Used by the UI to show a spinning activity indicator.
+        /// </summary>
+        public bool IsReconnecting => _reconnectionInProgress;
+
+        /// <summary>
+        /// Child instructions that will be executed after dome reconnection completes.
+        /// This allows users to add actions like re-centering the target.
+        /// </summary>
+        private TriggerInstructionContainer? _instructions;
+        
+        [JsonProperty]
+        public TriggerInstructionContainer Instructions
+        {
+            get
+            {
+                // Lazy initialization to avoid MEF composition issues
+                if (_instructions == null)
+                {
+                    _instructions = new TriggerInstructionContainer();
+                    _instructions.PseudoParent = this;
+                    _instructions.AttachNewParent(Parent);
+                }
+                return _instructions;
+            }
+            set
+            {
+                _instructions = value;
+                if (_instructions != null)
+                {
+                    _instructions.PseudoParent = this;
+                }
+                RaisePropertyChanged();
+            }
+        }
+        
+        // Runner for executing child instructions (separate from base TriggerRunner)
+        private TriggerInstructionContainer? InstructionRunner { get; set; }
 
         [ImportingConstructor]
         public DomeReconnectionTrigger(
@@ -93,6 +134,9 @@ namespace ScopeDomeWatchdog.Nina.Triggers
         {
             this.sequenceMediator = sequenceMediator;
             this.applicationStatusMediator = applicationStatusMediator;
+
+            // Set the display name for the sequence editor
+            Name = "Dome Reconnection Trigger";
 
             // Create watchdog that polls every 5 seconds (same as "When" plugin)
             ConditionWatchdog = new ConditionWatchdog(InterruptWhenReconnecting, TimeSpan.FromSeconds(5));
@@ -106,23 +150,69 @@ namespace ScopeDomeWatchdog.Nina.Triggers
         {
             CopyMetaData(cloneMe);
             TimeoutMinutes = cloneMe.TimeoutMinutes;
+            
+            // Clone the instruction container
+            Instructions = (TriggerInstructionContainer)cloneMe.Instructions.Clone();
+            Instructions.PseudoParent = this;
         }
 
         public override object Clone()
         {
             return new DomeReconnectionTrigger(this);
         }
+        
+        /// <summary>
+        /// Called after JSON deserialization to fix up parent references.
+        /// </summary>
+        [OnDeserialized]
+        public void OnDeserialized(StreamingContext context)
+        {
+            if (_instructions != null)
+            {
+                _instructions.PseudoParent = this;
+            }
+        }
 
         public override void SequenceBlockInitialize()
         {
             LogDebug("SequenceBlockInitialize - starting watchdog");
             ConditionWatchdog?.Start();
+            
+            // Attach child instructions to parent container
+            if (_instructions != null && Parent != null)
+            {
+                _instructions.AttachNewParent(Parent);
+            }
         }
 
         public override void SequenceBlockTeardown()
         {
-            LogDebug("SequenceBlockTeardown - stopping watchdog");
+            LogDebug("SequenceBlockTeardown - stopping watchdog and resetting state");
             try { ConditionWatchdog?.Cancel(); } catch { }
+            
+            // Detach and reset child instructions
+            if (_instructions != null)
+            {
+                try
+                {
+                    _instructions.ResetProgress();
+                }
+                catch { }
+                _instructions.AttachNewParent(null);
+            }
+            
+            // Reset all global state when leaving trigger
+            bool wasReconnecting = _reconnectionInProgress;
+            _reconnectionInProgress = false;
+            _inFlight = false;
+            _triggered = false;
+            _critical = false;
+            
+            if (wasReconnecting)  // Only notify UI if we were actually reconnecting
+            {
+                RaisePropertyChanged(nameof(IsReconnecting));
+            }
+            LogDebug("SequenceBlockTeardown: Reset all global state");
         }
 
         public override void AfterParentChanged()
@@ -131,9 +221,18 @@ namespace ScopeDomeWatchdog.Nina.Triggers
             {
                 SequenceBlockTeardown();
             }
-            else if (Parent.Status == SequenceEntityStatus.RUNNING)
+            else 
             {
-                SequenceBlockInitialize();
+                // Attach child instructions to new parent
+                if (_instructions != null)
+                {
+                    _instructions.AttachNewParent(Parent);
+                }
+                
+                if (Parent.Status == SequenceEntityStatus.RUNNING)
+                {
+                    SequenceBlockInitialize();
+                }
             }
         }
 
@@ -167,9 +266,10 @@ namespace ScopeDomeWatchdog.Nina.Triggers
             if (!sequenceMediator.IsAdvancedSequenceRunning()) return;
             
             // Prevent re-entry (same as "When" plugin)
-            if (_inFlight || _triggered)
+            // Also check _reconnectionInProgress to prevent retriggering while Execute is still running
+            if (_inFlight || _triggered || _reconnectionInProgress)
             {
-                LogDebug("InterruptWhenReconnecting: Already inFlight or triggered, returning");
+                LogDebug($"InterruptWhenReconnecting: Already in progress (inFlight={_inFlight}, triggered={_triggered}, reconnecting={_reconnectionInProgress}), returning");
                 return;
             }
 
@@ -179,7 +279,11 @@ namespace ScopeDomeWatchdog.Nina.Triggers
                 Status != SequenceEntityStatus.DISABLED)
             {
                 _triggered = true;
-                _reconnectionInProgress = true;
+                if (!_reconnectionInProgress)  // Only update if not already true
+                {
+                    _reconnectionInProgress = true;
+                    RaisePropertyChanged(nameof(IsReconnecting));
+                }
                 LogDebug("InterruptWhenReconnecting: Canceling sequence for reconnection...");
 
                 _critical = true;
@@ -233,7 +337,11 @@ namespace ScopeDomeWatchdog.Nina.Triggers
                 using var startedEvent = EventWaitHandle.OpenExisting(RECONNECTION_STARTED_EVENT);
                 if (startedEvent.WaitOne(0))
                 {
-                    _reconnectionInProgress = true;
+                    if (!_reconnectionInProgress)  // Only update if not already true
+                    {
+                        _reconnectionInProgress = true;
+                        RaisePropertyChanged(nameof(IsReconnecting));
+                    }
                     LogDebug("ShouldTrigger: TRUE (event signaled)");
                     return true;
                 }
@@ -295,9 +403,7 @@ namespace ScopeDomeWatchdog.Nina.Triggers
                             progress.Report(new ApplicationStatus
                             {
                                 Status = $"ScopeDome reconnection timeout ({TimeoutMinutes} min) - continuing anyway",
-                                Source = "ScopeDome Watchdog",
-                                Status2 = "WARNING",
-                                Status3 = "Sequence will continue but dome may not be ready"
+                                Source = "ScopeDome Watchdog"
                             });
                             break;
                         }
@@ -349,8 +455,7 @@ namespace ScopeDomeWatchdog.Nina.Triggers
                             progress.Report(new ApplicationStatus
                             {
                                 Status = $"ScopeDome reconnection timeout ({TimeoutMinutes} min) - continuing anyway",
-                                Source = "ScopeDome Watchdog",
-                                Status2 = "WARNING"
+                                Source = "ScopeDome Watchdog"
                             });
                             break;
                         }
@@ -380,7 +485,11 @@ namespace ScopeDomeWatchdog.Nina.Triggers
                     }
                 }
 
-                _reconnectionInProgress = false;
+                if (_reconnectionInProgress)  // Only update UI if value is actually changing
+                {
+                    _reconnectionInProgress = false;
+                    RaisePropertyChanged(nameof(IsReconnecting));
+                }
                 LogDebug("Execute: Reconnection complete, resuming sequence");
 
                 progress.Report(new ApplicationStatus
@@ -391,11 +500,52 @@ namespace ScopeDomeWatchdog.Nina.Triggers
 
                 // Small delay to let dome stabilize
                 await Task.Delay(2000, token);
+                
+                // Run child instructions (e.g., re-center target, resync mount)
+                if (Instructions.Items.Count > 0)
+                {
+                    LogDebug($"Execute: Running {Instructions.Items.Count} post-reconnection instructions");
+                    progress.Report(new ApplicationStatus
+                    {
+                        Status = "Running post-reconnection instructions...",
+                        Source = "ScopeDome Watchdog"
+                    });
+                    
+                    InstructionRunner = Instructions;
+                    await InstructionRunner.Run(progress, token);
+                    
+                    LogDebug("Execute: Post-reconnection instructions complete");
+                }
             }
             finally
             {
+                // Reset all global state
                 _inFlight = false;
                 _triggered = false;
+                
+                if (_reconnectionInProgress)  // Only notify UI if value is actually changing
+                {
+                    _reconnectionInProgress = false;
+                    RaisePropertyChanged(nameof(IsReconnecting));
+                    LogDebug("Execute: Spinner stopped - reconnection complete");
+                }
+                
+                _critical = false;
+                LogDebug("Execute: State reset (inFlight, triggered, reconnectionInProgress, critical)");
+                
+                // Reset child instructions state
+                if (Instructions != null)
+                {
+                    try
+                    {
+                        Instructions.ResetProgress();
+                        LogDebug("Execute: Reset child instructions state");
+                    }
+                    catch (Exception ex)
+                    {
+                        LogDebug($"Execute: Error resetting instructions: {ex.Message}");
+                    }
+                }
             }
         }
 

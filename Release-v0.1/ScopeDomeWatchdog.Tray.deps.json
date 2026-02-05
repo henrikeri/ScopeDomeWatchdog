@@ -1,0 +1,39 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "ScopeDomeWatchdog.Tray/1.0.0": {
+        "dependencies": {
+          "ScopeDomeWatchdog.Core": "1.0.0"
+        },
+        "runtime": {
+          "ScopeDomeWatchdog.Tray.dll": {}
+        }
+      },
+      "ScopeDomeWatchdog.Core/1.0.0": {
+        "runtime": {
+          "ScopeDomeWatchdog.Core.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "ScopeDomeWatchdog.Tray/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "ScopeDomeWatchdog.Core/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}
