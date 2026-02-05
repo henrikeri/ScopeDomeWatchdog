@@ -72,6 +72,10 @@ Required files:
 - Plugin requires the watchdog tray app to be running
 - ASCOM v7 or later
 
+### Requirements
+- Shelly power plug for power cycling
+
+
 ## Build
 
 ```bash
