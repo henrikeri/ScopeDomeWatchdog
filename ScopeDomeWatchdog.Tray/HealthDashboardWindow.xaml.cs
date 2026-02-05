@@ -20,6 +20,7 @@ public partial class HealthDashboardWindow : Window
         _historyService = historyService;
         _metricsTracker = runner.GetHealthMetrics;
         InitializeComponent();
+        WindowChromeHelper.ApplyDarkTitleBar(this);
         RestartHistoryGrid.ItemsSource = _historyItems;
         RefreshMetrics();
     }

@@ -13,6 +13,7 @@ public partial class SelectAscomDeviceWindow : Window
     public SelectAscomDeviceWindow(IEnumerable<AscomDeviceItem> items)
     {
         InitializeComponent();
+        WindowChromeHelper.ApplyDarkTitleBar(this);
         var itemList = items.ToList();
         DeviceList.ItemsSource = itemList;
         

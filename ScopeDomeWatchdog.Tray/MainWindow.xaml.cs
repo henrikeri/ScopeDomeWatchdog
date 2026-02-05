@@ -43,6 +43,7 @@ public partial class MainWindow : Window
         _ascomTester = new AscomConnectionTester(_staRunner);
 
         InitializeComponent();
+        WindowChromeHelper.ApplyDarkTitleBar(this);
         UpdateConfigSummary();
         RefreshLogs();
 

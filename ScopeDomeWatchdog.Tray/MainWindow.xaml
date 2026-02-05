@@ -6,7 +6,8 @@
         xmlns:local="clr-namespace:ScopeDomeWatchdog.Tray"
         mc:Ignorable="d"
         Title="ScopeDome Watchdog" Height="700" Width="960"
-        Icon="pack://application:,,,/Resources/app.ico">
+        Icon="pack://application:,,,/Resources/app.ico"
+        Background="{StaticResource BackgroundColor}">
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />

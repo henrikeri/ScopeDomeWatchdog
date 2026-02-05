@@ -13,6 +13,7 @@ public partial class SelectShellyRelayWindow : Window
     public SelectShellyRelayWindow(IEnumerable<ShellyRelayItem> items)
     {
         InitializeComponent();
+        WindowChromeHelper.ApplyDarkTitleBar(this);
         RelayList.ItemsSource = items.ToList();
     }
 

@@ -27,6 +27,7 @@ public partial class SettingsWindow : Window
         _configPath = configPath;
         _switchEnumerator = new AscomSwitchEnumerator(_staRunner);
         InitializeComponent();
+        WindowChromeHelper.ApplyDarkTitleBar(this);
         LoadConfig();
     }
 

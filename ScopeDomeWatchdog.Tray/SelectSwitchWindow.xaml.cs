@@ -13,6 +13,7 @@ public partial class SelectSwitchWindow : Window
     public SelectSwitchWindow(IEnumerable<AscomSwitchInfo> items)
     {
         InitializeComponent();
+        WindowChromeHelper.ApplyDarkTitleBar(this);
         SwitchGrid.ItemsSource = items.ToList();
     }
 
