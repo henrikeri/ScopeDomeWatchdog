@@ -34,12 +34,42 @@ Key settings:
 
 ## N.I.N.A. Plugin
 
-The "Dome Reconnection Trigger" pauses your imaging sequence when dome reconnection 
-is detected and automatically resumes when complete. Add it to Global Triggers for 
-session-wide protection.
+The **Dome Reconnection Trigger** integrates with N.I.N.A. (Nighttime Imaging 'N' Astronomy) to 
+automatically pause your imaging sequence when the dome loses connectivity and resumes when 
+recovery completes.
 
-**Installation:** Copy `ScopeDomeWatchdog.Nina` build output to:
-`%LOCALAPPDATA%\NINA\Plugins\3.0.0\ScopeDomeWatchdog\`
+### How It Works
+
+1. The watchdog tray app detects dome connectivity loss
+2. Signals the NINA plugin via Windows named events (`Global\ScopeDome_ReconnectionStarted`)
+3. Plugin cancels the running sequence using `CancelAdvancedSequence()`
+4. Watchdog performs power-cycle recovery and ASCOM reconnection
+5. Signals completion via `Global\ScopeDome_ReconnectionComplete`
+6. Plugin resumes sequence from same position using `StartAdvancedSequence(true)`
+
+### Installation
+
+Copy the plugin build output to your NINA plugins folder:
+
+```
+%LOCALAPPDATA%\NINA\Plugins\3.0.0\ScopeDomeWatchdog\
+```
+
+Required files:
+- `ScopeDomeWatchdog.Nina.dll`
+
+### Usage
+
+1. Open N.I.N.A. and go to **Options > Plugins**
+2. Enable **ScopeDome Watchdog**
+3. In your sequence, go to **Global Triggers**
+4. Add **Dome Reconnection Trigger** from the ScopeDomeWatchdog category
+5. The trigger will automatically monitor for reconnection events
+
+### Compatibility
+
+- N.I.N.A. 3.0 or later
+- Requires the watchdog tray app to be running
 
 ## Build
 
