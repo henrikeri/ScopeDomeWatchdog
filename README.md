@@ -68,8 +68,9 @@ Required files:
 
 ### Compatibility
 
-- N.I.N.A. 3.0 or later
-- Requires the watchdog tray app to be running
+- N.I.N.A. 3.2 or later
+- Plugin requires the watchdog tray app to be running
+- ASCOM v7 or later
 
 ## Build
 
