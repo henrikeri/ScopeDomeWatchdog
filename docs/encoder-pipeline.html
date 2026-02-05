@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ScopeDome Watchdog Application Pipeline</title>
+  <style>
+    body { font-family: Segoe UI, Arial, sans-serif; background:#f5f5f5; color:#1f1f1f; margin:0; }
+    main { max-width: 980px; margin: 24px auto; background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 20px; }
+    h1 { font-size: 22px; margin: 0 0 12px; }
+    .section { margin: 16px 0; }
+    .pipe { display: grid; gap: 10px; }
+    .step { border: 1px solid #e0e0e0; border-radius: 6px; padding: 12px; background: #fafafa; }
+    .title { font-weight: 600; color: #0078d4; }
+    .meta { font-size: 12px; color: #666; margin-top: 6px; }
+    .arrow { text-align: center; color: #999; font-size: 18px; }
+    code { background:#f0f0f0; padding:2px 4px; border-radius:4px; }
+    ul { margin: 8px 0 0 18px; }
+    figure { margin: 12px 0; padding: 10px; background: #f8f8f8; border: 1px solid #e6e6e6; border-radius: 6px; }
+    figcaption { font-size: 12px; color: #555; margin-top: 6px; }
+    pre { margin: 0; white-space: pre-wrap; font-family: Consolas, "Courier New", monospace; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>ScopeDome Watchdog Solution Pipeline (Developer Reference)</h1>
+
+    <div class="section">
+      <p>This page documents the full runtime pipeline for the entire solution (all applications and supporting scripts). It is intended to help developers understand how configuration, UI, background monitoring, and restart orchestration flow end-to-end.</p>
+
+      <figure>
+        <pre>Solution Overview
+┌───────────────────────────────┐
+│ ScopeDomeWatchdog.Tray (WPF) │
+│  - UI + Tray Icon            │
+│  - Config editor             │
+│  - Starts Watchdog           │
+└──────────────┬────────────────┘
+               │ uses
+┌──────────────▼────────────────┐
+│ ScopeDomeWatchdog.Core (Lib) │
+│  - Watchdog runner            │
+│  - Restart sequence           │
+│  - Encoder cache              │
+│  - ASCOM & HTTP clients        │
+└──────────────┬────────────────┘
+               │ invokes
+┌──────────────▼────────────────┐
+│ External Systems              │
+│  - Dome HTTP API              │
+│  - ASCOM Dome/Switch drivers  │
+│  - Shelly Relay               │
+└──────────────┬────────────────┘
+               │ optional/manual trigger
+┌──────────────▼────────────────┐
+│ ScopeDomeWatchdog.Trigger     │
+│  - CLI trigger for restart    │
+└───────────────────────────────┘
+               │ optional ops scripts
+┌──────────────▼────────────────┐
+│ PowerShell scripts             │
+│  - restartScopedomeLocalv2     │
+│  - ScopeDome_Watchdog_v4       │
+└───────────────────────────────┘
+        </pre>
+        <figcaption>Figure 1 — Solution-level architecture and primary dependencies.</figcaption>
+      </figure>
+    </div>
+
+    <div class="section">
+      <h2>Application Inventory</h2>
+      <ul>
+        <li><strong>ScopeDomeWatchdog.Tray</strong> (WPF): User-facing tray app that loads config, hosts the main window, and controls watchdog lifecycle.</li>
+        <li><strong>ScopeDomeWatchdog.Core</strong> (Class Library): All shared business logic (config, watchdog loop, restart sequence, HTTP/ASCOM integration).</li>
+        <li><strong>ScopeDomeWatchdog.Trigger</strong> (Console): Minimal CLI that signals a restart path without UI.</li>
+        <li><strong>PowerShell Scripts</strong>: Operational utilities for local restarts and scheduled/remote workflows.</li>
+        <li><strong>Docs</strong>: HTML pipeline reference (this file) and related documentation in docs/.</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>Runtime Pipeline — End-to-End</h2>
+      <div class="pipe">
+        <div class="step">
+          <div class="title">A) Tray App Startup → Load Config + Wire Services</div>
+          <div>The WPF tray application bootstraps core services and UI state.</div>
+          <ul>
+            <li>Config file location: <code>%APPDATA%\ScopeDomeWatchdog\config.json</code>.</li>
+            <li>Creates default config and log directory if missing.</li>
+            <li>Instantiates core services (watchdog, restart sequence, encoder cache).</li>
+            <li>Creates tray icon and main window; can start minimized.</li>
+          </ul>
+          <div class="meta">Files: ScopeDomeWatchdog.Tray/App.xaml.cs, ScopeDomeWatchdog.Core/Services/ConfigService.cs</div>
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="step">
+          <div class="title">B) Encoder Cache Startup Read</div>
+          <div>Immediately reads encoder via the dome HTTP API and stores it in config.</div>
+          <ul>
+            <li>HTTP GET: <code>http://&lt;DomeHttpIp&gt;/?getStatus</code> (Basic Auth).</li>
+            <li>Parses response and persists encoder + UTC timestamp.</li>
+          </ul>
+          <div class="meta">Files: ScopeDomeWatchdog.Core/Services/ScopeDomeEncoderCacheService.cs, ScopeDomeWatchdog.Core/Services/ScopeDomeHttpClient.cs</div>
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="step">
+          <div class="title">C) Encoder Cache Polling Loop</div>
+          <div>Polls on a fixed schedule (>= 1 min) and updates cached values.</div>
+          <ul>
+            <li>Timer loop runs independently of the watchdog loop.</li>
+            <li>Errors are swallowed to keep the background loop alive.</li>
+          </ul>
+          <div class="meta">File: ScopeDomeWatchdog.Core/Services/ScopeDomeEncoderCacheService.cs</div>
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="step">
+          <div class="title">D) UI + Tray Interactions</div>
+          <div>Main window surfaces status, cached encoder, logs, and commands.</div>
+          <ul>
+            <li>Start/Stop watchdog loop.</li>
+            <li>Manual restart (tray menu or UI button).</li>
+            <li>Settings changes persist to config and can refresh cache.</li>
+          </ul>
+          <div class="meta">Files: ScopeDomeWatchdog.Tray/MainWindow.xaml, ScopeDomeWatchdog.Tray/MainWindow.xaml.cs, ScopeDomeWatchdog.Tray/Services/TrayIconService.cs</div>
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="step">
+          <div class="title">E) Watchdog Loop → Ping Monitor</div>
+          <div>Periodic ping loop tracks failures and latency.</div>
+          <ul>
+            <li>Ping interval + timeout are configurable.</li>
+            <li>Counts consecutive failures and computes latency averages.</li>
+            <li>Cooldown window prevents immediate re-triggering.</li>
+            <li>Manual trigger can force restart even when healthy.</li>
+          </ul>
+          <div class="meta">File: ScopeDomeWatchdog.Core/Services/WatchdogRunner.cs</div>
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="step">
+          <div class="title">F) Restart Decision → Sequence Orchestration</div>
+          <div>On threshold failure (or manual trigger), restart flow starts.</div>
+          <ul>
+            <li>Named mutex protects against concurrent cycles.</li>
+            <li>Restart events and errors logged to configured directory.</li>
+          </ul>
+          <div class="meta">File: ScopeDomeWatchdog.Core/Services/RestartSequenceService.cs</div>
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="step">
+          <div class="title">G) Power Control (Shelly Relay)</div>
+          <div>Controls power state via Shelly RPC endpoints.</div>
+          <ul>
+            <li>Pre-power wait, OFF duration, and post-power wait are configurable.</li>
+            <li>Power-on if already off; otherwise cycles power.</li>
+          </ul>
+          <div class="meta">File: ScopeDomeWatchdog.Core/Services/ShellyClient.cs</div>
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="step">
+          <div class="title">H) Optional Encoder Restore (Pre-ASCOM)</div>
+          <div>If Home Action is <strong>Write Cached Encoder</strong>, restore encoder value.</div>
+          <ul>
+            <li>HTTP GET: <code>http://&lt;DomeHttpIp&gt;/?setEncoderA=&lt;CachedEncoderValue&gt;</code> (Basic Auth).</li>
+            <li>Skipped if cache is missing or IP not configured.</li>
+          </ul>
+          <div class="meta">Files: ScopeDomeWatchdog.Core/Services/RestartSequenceService.cs, ScopeDomeWatchdog.Core/Services/ScopeDomeHttpClient.cs</div>
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="step">
+          <div class="title">I) Launch Dome Process</div>
+          <div>Starts the ASCOM dome server executable.</div>
+          <ul>
+            <li>Uses configured EXE path and post-launch wait.</li>
+          </ul>
+          <div class="meta">File: ScopeDomeWatchdog.Core/Services/RestartSequenceService.cs</div>
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="step">
+          <div class="title">J) ASCOM Dome Sequence</div>
+          <div>Home action determines behavior:</div>
+          <ul>
+            <li><strong>AutoHome:</strong> Connect to dome driver and run FindHome.</li>
+            <li><strong>Write Cached Encoder:</strong> Skip FindHome entirely.</li>
+          </ul>
+          <div class="meta">File: ScopeDomeWatchdog.Core/Services/RestartSequenceService.cs</div>
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="step">
+          <div class="title">K) ASCOM Switch Sequence (Fan)</div>
+          <div>Connects to ASCOM Switch driver and ensures fan is ON.</div>
+          <ul>
+            <li>Retries and timeouts are configurable.</li>
+          </ul>
+          <div class="meta">File: ScopeDomeWatchdog.Core/Services/RestartSequenceService.cs</div>
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="step">
+          <div class="title">L) Post-Cycle Grace + Resume Monitoring</div>
+          <div>Optional grace window prevents immediate retriggering.</div>
+          <ul>
+            <li>Watchdog loop resumes normal monitoring.</li>
+          </ul>
+          <div class="meta">Files: ScopeDomeWatchdog.Core/Services/WatchdogRunner.cs, ScopeDomeWatchdog.Core/Services/RestartSequenceService.cs</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Trigger App Pipeline (CLI)</h2>
+      <figure>
+        <pre>ScopeDomeWatchdog.Trigger Execution Flow
+1) Parse optional args:
+   --eventName &lt;name&gt;    (default: ScopeDomeWatchdog.TriggerRestart)
+   --config &lt;path&gt;       (optional: load event name from config)
+   
+2) Resolve event name:
+   If --config provided and file exists, load TriggerEventName from config
+   Otherwise use --eventName or fall back to default
+   
+3) Signal Windows named event:
+   Open or create EventWaitHandle with resolved name
+   Set the event to wake the main watchdog loop
+   
+4) Exit with status:
+   0 = Success
+   1 = Config load failed or event creation failed
+   2 = Event signaling failed
+        </pre>
+        <figcaption>Figure 2 — The trigger app provides a minimal non-UI restart entry point. No input is required; sensible defaults are used.</figcaption>
+      </figure>
+      <div class="meta">File: ScopeDomeWatchdog.Trigger/Program.cs</div>
+      <p><strong>Usage:</strong> Can be run with zero arguments and will signal the default event. Optionally provide <code>--config path/to/config.json</code> to read the event name from config, or <code>--eventName SomeName</code> to override the event name explicitly.</p>
+    </div>
+
+    <div class="section">
+      <h2>Operational Scripts (PowerShell)</h2>
+      <figure>
+        <pre>restartScopedomeLocalv2_trigger.ps1
+- Calls the Trigger app or equivalent restart entry point
+- Suitable for scheduled tasks or manual ops
+
+ScopeDome_Watchdog_v4.ps1
+- Legacy/ops helper script for restart workflows
+- Useful for debugging or remote operations
+        </pre>
+        <figcaption>Figure 3 — PowerShell scripts serve as operational wrappers.</figcaption>
+      </figure>
+    </div>
+
+    <div class="section">
+      <h2>Data & Logging Flow</h2>
+      <figure>
+        <pre>Data Flow
+Config (config.json)
+  ├─ Read at startup (Tray app)
+  ├─ Updated by settings UI
+  └─ Updated by encoder cache service
+
+Logs
+  ├─ Restart logs (RestartSequenceService)
+  └─ Watchdog status / errors (WatchdogRunner)
+        </pre>
+        <figcaption>Figure 4 — Configuration and logging are shared across apps via Core services.</figcaption>
+      </figure>
+    </div>
+  </main>
+</body>
+</html>

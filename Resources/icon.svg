@@ -1,0 +1,28 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- Background circle -->
+  <circle cx="128" cy="128" r="120" fill="#0078D4" stroke="#005A9E" stroke-width="4"/>
+  
+  <!-- Dome structure (bottom half circle) -->
+  <path d="M 48 148 Q 48 88, 128 88 Q 208 88, 208 148 L 208 168 L 48 168 Z" fill="#FFFFFF" stroke="#005A9E" stroke-width="3"/>
+  
+  <!-- Dome top arch -->
+  <path d="M 68 148 Q 68 108, 128 108 Q 188 108, 188 148" fill="none" stroke="#005A9E" stroke-width="2" opacity="0.5"/>
+  
+  <!-- Dome slit (opening) -->
+  <rect x="118" y="98" width="20" height="50" fill="#005A9E"/>
+  
+  <!-- Watchdog eye (left) -->
+  <circle cx="98" cy="138" r="12" fill="#005A9E"/>
+  <circle cx="98" cy="138" r="6" fill="#FFD700"/>
+  
+  <!-- Watchdog eye (right) -->
+  <circle cx="158" cy="138" r="12" fill="#005A9E"/>
+  <circle cx="158" cy="138" r="6" fill="#FFD700"/>
+  
+  <!-- Alert symbol (shield) -->
+  <path d="M 128 180 L 108 190 L 108 210 Q 108 220, 128 225 Q 148 220, 148 210 L 148 190 Z" fill="#FFD700" stroke="#005A9E" stroke-width="2"/>
+  
+  <!-- Exclamation mark -->
+  <line x1="128" y1="195" x2="128" y2="208" stroke="#005A9E" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="128" cy="215" r="2" fill="#005A9E"/>
+</svg>

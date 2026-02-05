@@ -1,0 +1,26 @@
+<Window x:Class="ScopeDomeWatchdog.Tray.SelectSwitchWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Select ASCOM Switch" Height="400" Width="700">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <DataGrid Name="SwitchGrid" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Index" Binding="{Binding Index}" Width="60" />
+                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
+                <DataGridTextColumn Header="CanWrite" Binding="{Binding CanWrite}" Width="80" />
+                <DataGridTextColumn Header="State" Binding="{Binding State}" Width="80" />
+                <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="80" />
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Width="90" Margin="0,0,8,0" Content="OK" Click="OkButton_Click" />
+            <Button Width="90" Content="Cancel" Click="CancelButton_Click" />
+        </StackPanel>
+    </Grid>
+</Window>

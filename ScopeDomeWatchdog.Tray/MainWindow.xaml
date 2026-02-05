@@ -1,0 +1,93 @@
+﻿<Window x:Class="ScopeDomeWatchdog.Tray.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:ScopeDomeWatchdog.Tray"
+        mc:Ignorable="d"
+        Title="ScopeDome Watchdog" Height="700" Width="960"
+        Icon="pack://application:,,,/Resources/app.ico">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <TextBlock Text="ScopeDome Watchdog" FontWeight="Bold" FontSize="20" />
+            <TextBlock Name="StatusIndicator" Margin="0,4,0,0" FontSize="14" Foreground="{StaticResource TextMutedColor}" />
+        </StackPanel>
+
+        <!-- Status Panel -->
+        <Border Grid.Row="1" Background="{StaticResource SurfaceColor}" BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="Live Status" FontWeight="Bold" FontSize="12" Foreground="{StaticResource InfoColor}" Grid.ColumnSpan="2" Margin="0,0,0,8" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Name="StatusText" Text="Initializing..." FontSize="11" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Name="CooldownText" Text="Cooldown: n/a" FontSize="11" />
+                <TextBlock Grid.Row="2" Grid.Column="0" Name="LastRestartText" Margin="0,4,0,0" Text="Last restart: n/a" FontSize="11" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Name="UptimeText" Margin="0,4,0,0" Text="Uptime: n/a" FontSize="11" />
+                <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Name="ConfigText" Margin="0,8,0,0" TextWrapping="Wrap" FontSize="10" Foreground="{StaticResource TextMutedColor}" />
+                <TextBlock Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" Name="EncoderCacheText" Margin="0,6,0,0" TextWrapping="Wrap" FontSize="10" Foreground="{StaticResource TextMutedColor}" />
+            </Grid>
+        </Border>
+
+        <!-- Tabs / Log Viewer -->
+        <TabControl Grid.Row="2" Margin="0,0,0,12">
+            <TabItem Header="Live Log">
+                <Border Background="{StaticResource SurfaceColor}" BorderThickness="0,1,0,0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <StackPanel Orientation="Horizontal" Margin="12,12,12,8">
+                            <Button Width="120" Content="Clear Log" Click="ClearLogButton_Click" Background="{StaticResource ErrorColor}" Foreground="White" Padding="8,6" FontSize="11" Margin="0,0,8,0" />
+                            <TextBlock VerticalAlignment="Center" Text="Live tail of ScopeDomeWatchdog.log" FontSize="11" Foreground="{StaticResource TextMutedColor}" />
+                        </StackPanel>
+                        <ScrollViewer Grid.Row="1" Name="LiveLogScroller" Margin="12,0,12,12" VerticalScrollBarVisibility="Auto">
+                            <TextBox Name="LiveLogTextBox" Background="{StaticResource BackgroundColor}" FontFamily="Consolas" FontSize="10" 
+                                     IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" />
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </TabItem>
+            <TabItem Header="Logs">
+                <Border Background="{StaticResource SurfaceColor}" BorderThickness="0,1,0,0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <StackPanel Orientation="Horizontal" Margin="12,12,12,8">
+                            <Button Width="120" Content="Refresh" Click="RefreshLogsButton_Click" Background="{StaticResource InfoColor}" Foreground="White" Padding="8,6" FontSize="11" />
+                            <TextBlock Margin="8,0,0,0" VerticalAlignment="Center" Text="View recent restart logs" FontSize="11" Foreground="{StaticResource TextMutedColor}" />
+                        </StackPanel>
+                        <ListBox Grid.Row="1" Name="LogsList" Margin="12,0,12,12" Background="{StaticResource BackgroundColor}" FontFamily="Consolas" FontSize="10" />
+                    </Grid>
+                </Border>
+            </TabItem>
+        </TabControl>
+
+        <!-- Button Bar -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Name="StartStopButton" Width="140" Height="32" Content="Start Watchdog" Click="StartStopButton_Click" Background="{StaticResource SuccessColor}" Foreground="White" FontWeight="Bold" Padding="12,8" Margin="0,0,8,0" />
+            <Button Name="TestAscomButton" Width="140" Height="32" Content="Test ASCOM" Click="TestAscomButton_Click" Background="{StaticResource InfoColor}" Foreground="White" Padding="12,8" Margin="0,0,8,0" />
+            <Button Name="SettingsButton" Width="100" Height="32" Content="Settings" Click="SettingsButton_Click" Padding="12,8" />
+        </StackPanel>
+    </Grid>
+</Window>

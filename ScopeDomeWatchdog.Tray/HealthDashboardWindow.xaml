@@ -1,0 +1,75 @@
+<Window x:Class="ScopeDomeWatchdog.Tray.HealthDashboardWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Health Dashboard" Height="700" Width="1000" Background="#1E1E1E" Foreground="#E0E0E0" WindowStartupLocation="CenterOwner">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header with key metrics -->
+        <Border Grid.Row="0" Background="#2D2D2D" BorderBrush="#404040" BorderThickness="1" CornerRadius="4" Padding="16" Margin="0,0,0,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                    <TextBlock Text="Total Restarts" Foreground="#888888" FontSize="11" Margin="0,0,0,4" />
+                    <TextBlock Name="TotalRestartsText" Text="0" FontSize="24" FontWeight="Bold" Foreground="#4CAF50" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Margin="12,0,12,0">
+                    <TextBlock Text="Success Rate" Foreground="#888888" FontSize="11" Margin="0,0,0,4" />
+                    <TextBlock Name="SuccessRateText" Text="0%" FontSize="24" FontWeight="Bold" Foreground="#2196F3" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Margin="12,0,12,0">
+                    <TextBlock Text="Ping Success Rate" Foreground="#888888" FontSize="11" Margin="0,0,0,4" />
+                    <TextBlock Name="PingSuccessRateText" Text="0%" FontSize="24" FontWeight="Bold" Foreground="#FF9800" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="3" Margin="12,0,0,0">
+                    <TextBlock Text="Avg Latency" Foreground="#888888" FontSize="11" Margin="0,0,0,4" />
+                    <TextBlock Name="AvgLatencyText" Text="n/a" FontSize="24" FontWeight="Bold" Foreground="#9C27B0" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Tabs for different views -->
+        <TabControl Grid.Row="1" Background="#1E1E1E" Foreground="#E0E0E0">
+            <TabItem Header="Restart History" Background="#2D2D2D" Foreground="#E0E0E0">
+                <Border Background="#1E1E1E" Padding="12">
+                    <DataGrid Name="RestartHistoryGrid" AutoGenerateColumns="False" CanUserAddRows="False" 
+                              Background="#2D2D2D" Foreground="#E0E0E0" BorderBrush="#404040" GridLinesVisibility="Horizontal">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Start Time" Binding="{Binding StartTimeDisplay}" Width="*" />
+                            <DataGridTextColumn Header="Duration" Binding="{Binding DurationDisplay}" Width="100" />
+                            <DataGridTextColumn Header="Status" Binding="{Binding StatusDisplay}" Width="80" />
+                            <DataGridTextColumn Header="Reason" Binding="{Binding TriggerReason}" Width="*" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Border>
+            </TabItem>
+
+            <TabItem Header="Latency Graph" Background="#2D2D2D" Foreground="#E0E0E0">
+                <Border Background="#1E1E1E" Padding="12">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <TextBlock Text="Latency graphing requires OxyPlot library." Foreground="#888888" TextAlignment="Center" />
+                        <TextBlock Text="Coming in next update..." Foreground="#888888" TextAlignment="Center" Margin="0,12,0,0" />
+                    </StackPanel>
+                </Border>
+            </TabItem>
+        </TabControl>
+
+        <!-- Close button -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Width="90" Content="Close" Click="CloseButton_Click" Background="#404040" Foreground="#E0E0E0" />
+        </StackPanel>
+    </Grid>
+</Window>
