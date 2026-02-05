@@ -25,6 +25,7 @@ using NINA.Sequencer.Trigger;
 using NINA.Sequencer.Utility;
 using NINA.WPF.Base.Interfaces.Mediator;
 using System;
+using System.ComponentModel;
 using System.ComponentModel.Composition;
 using System.IO;
 using System.Threading;
@@ -68,6 +69,10 @@ namespace ScopeDomeWatchdog.Nina.Triggers
         /// Maximum time to wait for reconnection before failing gracefully (in minutes).
         /// Set to 0 to wait indefinitely.
         /// </summary>
+        [Category("Reconnection")]
+        [DisplayName("Timeout (minutes)")]
+        [Description("Maximum time to wait for dome reconnection before failing gracefully. Set to 0 to wait indefinitely.")]
+        [DefaultValue(10)]
         public int TimeoutMinutes
         {
             get => _timeoutMinutes;
