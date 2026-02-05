@@ -5,11 +5,11 @@ using System.Runtime.InteropServices;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 [assembly: AssemblyTitle("ScopeDomeWatchdog")]
-[assembly: AssemblyDescription("NINA plugin for ScopeDome reconnection automation")]
+[assembly: AssemblyDescription("Intelligent ScopeDome monitoring and reconnection automation for NINA")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("DomeCheck Contributors")]
+[assembly: AssemblyCompany("Henrik Erevik Riise")]
 [assembly: AssemblyProduct("ScopeDomeWatchdog NINA Plugin")]
-[assembly: AssemblyCopyright("Copyright © 2026")]
+[assembly: AssemblyCopyright("Copyright © 2026 Henrik Erevik Riise")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -27,22 +27,22 @@ using System.Runtime.InteropServices;
 //      Build Number
 //      Revision
 //
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyVersion("0.1.0.0")]
+[assembly: AssemblyFileVersion("0.1.0.0")]
 
 // NINA Plugin Metadata (REQUIRED for plugin discovery)
 [assembly: AssemblyMetadata("MinimumApplicationVersion", "3.0.0.1001")]
 
 // Plugin Description
-[assembly: AssemblyMetadata("ShortDescription", "Automatically pauses NINA sequencer during ScopeDome reconnection events. Integrates with ScopeDomeWatchdog to prevent imaging failures during dome power cycling and ASCOM reconnection.")]
-[assembly: AssemblyMetadata("LongDescription", @"ScopeDomeWatchdog NINA Plugin provides seamless integration between the ScopeDomeWatchdog monitoring application and NINA's Advanced Sequencer.
+[assembly: AssemblyMetadata("ShortDescription", "Never lose another image to dome reconnections. Automatically pauses your sequence during ScopeDome power cycles and resumes when ready.")]
+[assembly: AssemblyMetadata("LongDescription", @"ScopeDomeWatchdog keeps your imaging sessions running smoothly by intelligently handling dome reconnections without manual intervention.
 
-Features:
-• Automatic Sequencer Pause/Resume - Sequencer automatically pauses when dome reconnection is detected
-• Real-time Status Updates - Shows reconnection progress and elapsed time in NINA UI
-• Timeout Protection - Fails gracefully if reconnection exceeds 5 minutes
-• Zero Configuration - Works automatically when installed alongside ScopeDomeWatchdog Tray app
-• IPC Communication - Uses Windows Named Events for reliable inter-process signaling
+🎯 Key Features:
+• Smart Sequencer Control - Automatically pauses imaging during dome reconnection and resumes when stable
+• Configurable Timeout - Set your own threshold for graceful failure if reconnection takes too long
+• Real-time Status - See reconnection progress directly in NINA's status bar
+• Zero-Touch Operation - Works seamlessly with ScopeDomeWatchdog tray app via inter-process communication
+• Reliable IPC - Uses Windows Named Events for bulletproof cross-process signaling
 
 Installation:
 1. Ensure ScopeDomeWatchdog Tray application is installed and running
@@ -59,9 +59,9 @@ Requirements:
 [assembly: AssemblyMetadata("LicenseURL", "https://opensource.org/licenses/MIT")]
 
 // Repository and Documentation
-[assembly: AssemblyMetadata("Repository", "https://github.com/yourusername/ScopeDomeWatchdog")]
-[assembly: AssemblyMetadata("Homepage", "https://github.com/yourusername/ScopeDomeWatchdog")]
-[assembly: AssemblyMetadata("ChangelogURL", "https://github.com/yourusername/ScopeDomeWatchdog/releases")]
+[assembly: AssemblyMetadata("Repository", "https://github.com/henrikeri/ScopeDomeWatchdog")]
+[assembly: AssemblyMetadata("Homepage", "https://github.com/henrikeri/ScopeDomeWatchdog")]
+[assembly: AssemblyMetadata("ChangelogURL", "https://github.com/henrikeri/ScopeDomeWatchdog/releases")]
 
 // Search Tags
 [assembly: AssemblyMetadata("Tags", "dome,scopedome,reconnection,automation,watchdog,ascom")]

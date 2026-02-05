@@ -61,6 +61,26 @@ namespace ScopeDomeWatchdog.Nina.Triggers
         // Background monitoring
         private ConditionWatchdog? ConditionWatchdog { get; set; }
 
+        // Configuration properties
+        private int _timeoutMinutes = 10;
+        
+        /// <summary>
+        /// Maximum time to wait for reconnection before failing gracefully (in minutes).
+        /// Set to 0 to wait indefinitely.
+        /// </summary>
+        public int TimeoutMinutes
+        {
+            get => _timeoutMinutes;
+            set
+            {
+                if (_timeoutMinutes != value)
+                {
+                    _timeoutMinutes = value;
+                    base.RaisePropertyChanged();
+                }
+            }
+        }
+
         [ImportingConstructor]
         public DomeReconnectionTrigger(
             ISequenceMediator sequenceMediator,
@@ -80,6 +100,7 @@ namespace ScopeDomeWatchdog.Nina.Triggers
             : this(cloneMe.sequenceMediator, cloneMe.applicationStatusMediator)
         {
             CopyMetaData(cloneMe);
+            TimeoutMinutes = cloneMe.TimeoutMinutes;
         }
 
         public override object Clone()
@@ -225,7 +246,7 @@ namespace ScopeDomeWatchdog.Nina.Triggers
         /// </summary>
         public override async Task Execute(ISequenceContainer context, IProgress<ApplicationStatus> progress, CancellationToken token)
         {
-            LogDebug("Execute: Starting wait for reconnection");
+            LogDebug($"Execute: Starting wait for reconnection (timeout: {TimeoutMinutes} minutes)");
 
             if (_critical)
             {
@@ -244,9 +265,12 @@ namespace ScopeDomeWatchdog.Nina.Triggers
                 _inFlight = true;
                 _triggered = false;
 
+                var startTime = DateTime.Now;
+                var timeoutSpan = TimeoutMinutes > 0 ? TimeSpan.FromMinutes(TimeoutMinutes) : TimeSpan.MaxValue;
+
                 progress.Report(new ApplicationStatus
                 {
-                    Status = "Waiting for ScopeDome reconnection...",
+                    Status = $"Waiting for ScopeDome reconnection... (timeout: {TimeoutMinutes} min)",
                     Source = "ScopeDome Watchdog"
                 });
 
@@ -257,11 +281,35 @@ namespace ScopeDomeWatchdog.Nina.Triggers
 
                     while (!token.IsCancellationRequested)
                     {
+                        // Check timeout
+                        var elapsed = DateTime.Now - startTime;
+                        if (elapsed >= timeoutSpan)
+                        {
+                            LogDebug($"Execute: Timeout reached ({TimeoutMinutes} minutes), failing gracefully");
+                            Logger.Warning($"ScopeDome reconnection exceeded {TimeoutMinutes} minute timeout. Sequence will continue but dome may not be ready.");
+                            progress.Report(new ApplicationStatus
+                            {
+                                Status = $"ScopeDome reconnection timeout ({TimeoutMinutes} min) - continuing anyway",
+                                Source = "ScopeDome Watchdog",
+                                Status2 = "WARNING",
+                                Status3 = "Sequence will continue but dome may not be ready"
+                            });
+                            break;
+                        }
+
                         if (completeEvent.WaitOne(1000))
                         {
                             LogDebug("Execute: Reconnection complete event received");
                             break;
                         }
+
+                        // Update progress with elapsed time
+                        var elapsedStr = $"{(int)elapsed.TotalMinutes}:{elapsed.Seconds:D2}";
+                        progress.Report(new ApplicationStatus
+                        {
+                            Status = $"Waiting for ScopeDome reconnection... ({elapsedStr} elapsed)",
+                            Source = "ScopeDome Watchdog"
+                        });
 
                         // Check if started event is still set
                         try
@@ -287,7 +335,31 @@ namespace ScopeDomeWatchdog.Nina.Triggers
                     // Wait for started event to be cleared
                     while (!token.IsCancellationRequested)
                     {
+                        // Check timeout
+                        var elapsed = DateTime.Now - startTime;
+                        if (elapsed >= timeoutSpan)
+                        {
+                            LogDebug($"Execute: Timeout reached ({TimeoutMinutes} minutes), failing gracefully");
+                            Logger.Warning($"ScopeDome reconnection exceeded {TimeoutMinutes} minute timeout. Sequence will continue but dome may not be ready.");
+                            progress.Report(new ApplicationStatus
+                            {
+                                Status = $"ScopeDome reconnection timeout ({TimeoutMinutes} min) - continuing anyway",
+                                Source = "ScopeDome Watchdog",
+                                Status2 = "WARNING"
+                            });
+                            break;
+                        }
+
                         await Task.Delay(1000, token);
+                        
+                        // Update progress with elapsed time
+                        var elapsedStr = $"{(int)elapsed.TotalMinutes}:{elapsed.Seconds:D2}";
+                        progress.Report(new ApplicationStatus
+                        {
+                            Status = $"Waiting for ScopeDome reconnection... ({elapsedStr} elapsed)",
+                            Source = "ScopeDome Watchdog"
+                        });
+                        
                         try
                         {
                             using var startedEvent = EventWaitHandle.OpenExisting(RECONNECTION_STARTED_EVENT);
