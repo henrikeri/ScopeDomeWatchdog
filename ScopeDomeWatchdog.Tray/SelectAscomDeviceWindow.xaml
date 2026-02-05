@@ -1,7 +1,8 @@
 <Window x:Class="ScopeDomeWatchdog.Tray.SelectAscomDeviceWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Select ASCOM Device" Height="400" Width="600">
+        Title="Select ASCOM Device" Height="400" Width="600"
+        Background="{StaticResource BackgroundColor}">
     <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />

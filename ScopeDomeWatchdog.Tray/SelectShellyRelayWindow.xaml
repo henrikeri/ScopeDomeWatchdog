@@ -1,7 +1,8 @@
 <Window x:Class="ScopeDomeWatchdog.Tray.SelectShellyRelayWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Select Shelly Relay" Height="300" Width="400" WindowStartupLocation="CenterOwner">
+        Title="Select Shelly Relay" Height="300" Width="400" WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BackgroundColor}">
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />

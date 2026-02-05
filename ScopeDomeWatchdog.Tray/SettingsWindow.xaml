@@ -1,7 +1,8 @@
 <Window x:Class="ScopeDomeWatchdog.Tray.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="ScopeDome Watchdog Settings" Height="700" Width="900">
+        Title="ScopeDome Watchdog Settings" Height="700" Width="900"
+        Background="{StaticResource BackgroundColor}">
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
