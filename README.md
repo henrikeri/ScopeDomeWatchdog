@@ -1,39 +1,63 @@
-# ScopeDomeWatchdog
+# ScopeDome Watchdog
 
-Two Windows applications in one solution:
-- ScopeDomeWatchdog.Tray (WPF tray watchdog)
-- ScopeDomeWatchdog.Trigger (CLI trigger)
-- ScopeDomeWatchdog.Core (shared logic)
+Automated recovery system for ScopeDome observatory domes. Monitors dome connectivity, 
+performs power-cycle recovery via Shelly smart plugs, and integrates with N.I.N.A. for 
+seamless imaging session continuity.
+
+## Components
+
+- **ScopeDomeWatchdog.Tray** - WPF system tray application with watchdog monitoring
+- **ScopeDomeWatchdog.Nina** - N.I.N.A. plugin for sequence pause/resume during reconnection
+- **ScopeDomeWatchdog.Trigger** - CLI tool for external triggering
+- **ScopeDomeWatchdog.Core** - Shared logic library
+
+## Features
+
+- Ping-based dome connectivity monitoring
+- Automatic power-cycle recovery via Shelly smart plugs
+- ASCOM dome driver integration (connect, FindHome, encoder caching)
+- ASCOM switch control for fan management during recovery
+- N.I.N.A. integration: pauses sequence mid-exposure during reconnection, resumes automatically
+- Real-time log viewer with dark theme UI
+- Configurable timeouts and cooldown periods
 
 ## Configuration
-Config is stored per-user at:
-%APPDATA%\ScopeDomeWatchdog\config.json
 
-Key settings include:
+Config stored at: `%APPDATA%\ScopeDomeWatchdog\config.json`
+
+Key settings:
 - Monitor IP, ping interval/timeout, fail threshold
 - Shelly IP, switch ID, off/on delays, cooldown
 - ASCOM dome/switch ProgID, fan switch index
-- Dome HTTP IP, Basic Auth username/password, encoder poll interval, home action mode
-- Named mutex and manual trigger event name
-- Log directory
+- Dome HTTP IP, Basic Auth credentials, encoder poll interval
+- Home action mode (AutoHome or WriteCachedEncoder)
 
-The tray app includes a Settings window where you can edit the JSON and select ASCOM devices and sub-switches.
+## N.I.N.A. Plugin
 
-## Run
-Build and run the tray app, then use the tray icon menu to open the main window, settings, or trigger a restart.
+The "Dome Reconnection Trigger" pauses your imaging sequence when dome reconnection 
+is detected and automatically resumes when complete. Add it to Global Triggers for 
+session-wide protection.
 
-## Trigger CLI
-Usage:
-- ScopeDomeWatchdog.Trigger.exe
-- ScopeDomeWatchdog.Trigger.exe --eventName "ScopeDomeWatchdog.TriggerRestart"
-- ScopeDomeWatchdog.Trigger.exe --config "C:\path\to\config.json"
+**Installation:** Copy `ScopeDomeWatchdog.Nina` build output to:
+`%LOCALAPPDATA%\NINA\Plugins\3.0.0\ScopeDomeWatchdog\`
 
-Exit codes:
-- 0 success
-- 1 failed to open/create event or load config
-- 2 failed to set event
+## Build
 
-## Publish
-Use these commands for single-file, self-contained x64 builds:
-- dotnet publish ScopeDomeWatchdog.Tray -c Release -r win-x64 /p:PublishSingleFile=true /p:SelfContained=true
-- dotnet publish ScopeDomeWatchdog.Trigger -c Release -r win-x64 /p:PublishSingleFile=true /p:SelfContained=true
+```bash
+dotnet build -c Release
+```
+
+## Publish (self-contained)
+
+```bash
+dotnet publish ScopeDomeWatchdog.Tray -c Release -r win-x64 /p:PublishSingleFile=true /p:SelfContained=true
+dotnet publish ScopeDomeWatchdog.Trigger -c Release -r win-x64 /p:PublishSingleFile=true /p:SelfContained=true
+```
+
+## License
+
+- **ScopeDomeWatchdog.Core, .Tray, .Trigger**: MIT License
+- **ScopeDomeWatchdog.Nina**: Mozilla Public License 2.0 (MPL-2.0)
+
+The NINA plugin uses patterns from the ["When" plugin](https://github.com/isbeorn/nina.plugin.when) 
+by Stefan Berg, licensed under MPL-2.0.

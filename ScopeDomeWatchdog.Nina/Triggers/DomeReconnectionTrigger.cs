@@ -1,9 +1,15 @@
 #region "copyright"
 /*
     ScopeDome Watchdog NINA Plugin
-    Pauses NINA sequence during dome reconnection events.
+    Copyright (c) 2026 henrikeri
     
-    Uses the same pattern as the "When Unsafe" trigger from isbeorn's When plugin.
+    This Source Code Form is subject to the terms of the Mozilla Public
+    License, v. 2.0. If a copy of the MPL was not distributed with this
+    file, You can obtain one at http://mozilla.org/MPL/2.0/.
+    
+    This plugin uses the ConditionWatchdog pattern and sequence interrupt/restart
+    approach from the "When" plugin by Stefan Berg (isbeorn86+NINA@googlemail.com)
+    and the N.I.N.A. contributors. See: https://github.com/isbeorn/nina.plugin.when
 */
 #endregion "copyright"
 
