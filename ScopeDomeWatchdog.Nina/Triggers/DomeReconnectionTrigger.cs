@@ -515,6 +515,12 @@ namespace ScopeDomeWatchdog.Nina.Triggers
                     await InstructionRunner.Run(progress, token);
                     
                     LogDebug("Execute: Post-reconnection instructions complete");
+                    
+                    progress.Report(new ApplicationStatus
+                    {
+                        Status = string.Empty,
+                        Source = "ScopeDome Watchdog"
+                    });
                 }
             }
             finally

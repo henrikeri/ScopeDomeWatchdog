@@ -46,6 +46,7 @@ public partial class MainWindow : Window
         WindowChromeHelper.ApplyDarkTitleBar(this);
         UpdateConfigSummary();
         RefreshLogs();
+        UpdateResetStatistics();
 
         _runner.StatusUpdated += status => Dispatcher.Invoke(() => UpdateStatus(status));
         _runner.RunningStateChanged += isRunning => Dispatcher.Invoke(() => UpdateRunningState(isRunning));
@@ -179,6 +180,46 @@ public partial class MainWindow : Window
         {
             EncoderCacheText.Text = "Cached encoder: n/a";
         }
+
+        UpdateResetStatistics();
+    }
+
+    private void UpdateResetStatistics()
+    {
+        try
+        {
+            var historyService = _restartService.GetHistoryService;
+            var totalResets = historyService.GetTotalRestarts();
+            TotalResetsText.Text = $"Total resets: {totalResets}";
+
+            var recentHistory = historyService.GetRecentHistory(1);
+            if (recentHistory.Count > 0)
+            {
+                var lastReset = recentHistory[0];
+                var elapsed = DateTime.UtcNow - lastReset.StartTimeUtc;
+                TimeSinceLastResetText.Text = $"Last reset: {FormatElapsedTime(elapsed)} ago";
+            }
+            else
+            {
+                TimeSinceLastResetText.Text = "Last reset: never";
+            }
+        }
+        catch
+        {
+            TotalResetsText.Text = "Total resets: --";
+            TimeSinceLastResetText.Text = "Last reset: --";
+        }
+    }
+
+    private static string FormatElapsedTime(TimeSpan elapsed)
+    {
+        if (elapsed.TotalDays >= 1)
+            return $"{(int)elapsed.TotalDays}d {elapsed.Hours}h";
+        if (elapsed.TotalHours >= 1)
+            return $"{(int)elapsed.TotalHours}h {elapsed.Minutes}m";
+        if (elapsed.TotalMinutes >= 1)
+            return $"{(int)elapsed.TotalMinutes}m {elapsed.Seconds}s";
+        return $"{(int)elapsed.TotalSeconds}s";
     }
 
     public void RefreshEncoderDisplay()

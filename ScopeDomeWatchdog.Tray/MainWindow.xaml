@@ -36,6 +36,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <TextBlock Text="Live Status" FontWeight="Bold" FontSize="12" Foreground="{StaticResource InfoColor}" Grid.ColumnSpan="2" Margin="0,0,0,8" />
@@ -46,6 +47,8 @@
                 <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Name="ConfigText" Margin="0,8,0,0" TextWrapping="Wrap" FontSize="10" Foreground="{StaticResource TextMutedColor}" />
                 <TextBlock Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" Name="EncoderCacheText" Margin="0,6,0,0" TextWrapping="Wrap" FontSize="10" Foreground="{StaticResource TextMutedColor}" />
                 <TextBlock Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" Name="SwitchCacheText" Margin="0,4,0,0" TextWrapping="Wrap" FontSize="10" Foreground="{StaticResource TextMutedColor}" />
+                <TextBlock Grid.Row="6" Grid.Column="0" Name="TotalResetsText" Margin="0,8,0,0" Text="Total resets: 0" FontSize="11" FontWeight="SemiBold" />
+                <TextBlock Grid.Row="6" Grid.Column="1" Name="TimeSinceLastResetText" Margin="0,8,0,0" Text="Last reset: never" FontSize="11" />
             </Grid>
         </Border>
 

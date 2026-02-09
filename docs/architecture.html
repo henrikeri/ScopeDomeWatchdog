@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScopeDome Watchdog - Architecture Documentation</title>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-purple: #a371f7;
+            --accent-orange: #d29922;
+            --accent-red: #f85149;
+            --accent-cyan: #39c5cf;
+            --border-color: #30363d;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1, h2, h3 {
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            border-bottom: 2px solid var(--accent-blue);
+            padding-bottom: 0.5rem;
+            margin-bottom: 2rem;
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            color: var(--accent-blue);
+            margin-top: 3rem;
+            margin-bottom: 1.5rem;
+        }
+
+        h3 {
+            font-size: 1.3rem;
+            color: var(--accent-purple);
+            margin-top: 2rem;
+        }
+
+        p {
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        /* Architecture Diagram */
+        .architecture-diagram {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            padding: 2rem;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+
+        .layer {
+            display: flex;
+            gap: 1.5rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .component-box {
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            min-width: 200px;
+            max-width: 280px;
+            text-align: center;
+            position: relative;
+        }
+
+        .component-box.nina-plugin {
+            border-color: var(--accent-purple);
+            box-shadow: 0 0 20px rgba(163, 113, 247, 0.2);
+        }
+
+        .component-box.tray-app {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 20px rgba(88, 166, 255, 0.2);
+        }
+
+        .component-box.core-lib {
+            border-color: var(--accent-green);
+            box-shadow: 0 0 20px rgba(63, 185, 80, 0.2);
+        }
+
+        .component-box.external {
+            border-color: var(--accent-orange);
+            box-shadow: 0 0 20px rgba(210, 153, 34, 0.2);
+        }
+
+        .component-box.trigger {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 20px rgba(57, 197, 207, 0.2);
+        }
+
+        .component-title {
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .component-desc {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .badge {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            background: var(--accent-blue);
+            color: #fff;
+            font-size: 0.7rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .badge.wpf { background: var(--accent-blue); }
+        .badge.dll { background: var(--accent-green); }
+        .badge.plugin { background: var(--accent-purple); }
+        .badge.cli { background: var(--accent-cyan); }
+
+        /* Connector Arrows */
+        .connectors {
+            display: flex;
+            justify-content: center;
+            gap: 3rem;
+            padding: 0.5rem 0;
+        }
+
+        .arrow {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+        }
+
+        .arrow::before {
+            content: '↓';
+            font-size: 1.5rem;
+            color: var(--accent-blue);
+        }
+
+        .arrow.bidirectional::before {
+            content: '↕';
+        }
+
+        /* Pipeline Diagram */
+        .pipeline {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+
+        .pipeline-step {
+            display: flex;
+            align-items: stretch;
+            min-height: 80px;
+        }
+
+        .step-number {
+            width: 60px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 1rem;
+        }
+
+        .step-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .step-line {
+            width: 2px;
+            flex: 1;
+            background: var(--accent-blue);
+            margin-top: 0.5rem;
+        }
+
+        .step-content {
+            flex: 1;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .step-title {
+            font-weight: bold;
+            color: var(--text-primary);
+            margin-bottom: 0.3rem;
+        }
+
+        .step-detail {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .step-component {
+            display: inline-block;
+            background: var(--bg-tertiary);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Service Grid */
+        .service-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .service-card {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+
+        .service-card h4 {
+            color: var(--accent-cyan);
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+        }
+
+        .service-card p {
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .service-card code {
+            background: var(--bg-primary);
+            padding: 0.1rem 0.3rem;
+            border-radius: 3px;
+            font-size: 0.85rem;
+            color: var(--accent-orange);
+        }
+
+        /* Data Flow Diagram */
+        .data-flow {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            padding: 2rem;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+
+        .flow-node {
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            min-width: 150px;
+            text-align: center;
+        }
+
+        .flow-arrow {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            min-width: 80px;
+        }
+
+        .flow-arrow span {
+            color: var(--accent-green);
+            font-size: 1.5rem;
+        }
+
+        /* Config Table */
+        .config-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        .config-table th,
+        .config-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border: 1px solid var(--border-color);
+        }
+
+        .config-table th {
+            background: var(--bg-tertiary);
+            color: var(--accent-blue);
+        }
+
+        .config-table td {
+            font-size: 0.9rem;
+        }
+
+        .config-table code {
+            background: var(--bg-primary);
+            padding: 0.1rem 0.3rem;
+            border-radius: 3px;
+            color: var(--accent-orange);
+        }
+
+        /* IPC Diagram */
+        .ipc-diagram {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            padding: 2rem;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+        }
+
+        .ipc-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .ipc-process {
+            background: var(--bg-secondary);
+            border: 2px solid var(--accent-purple);
+            border-radius: 8px;
+            padding: 1rem 1.5rem;
+            min-width: 180px;
+            text-align: center;
+        }
+
+        .ipc-signal {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        .ipc-signal-line {
+            width: 100%;
+            height: 2px;
+            background: var(--accent-green);
+            position: relative;
+        }
+
+        .ipc-signal-line::after {
+            content: '▶';
+            position: absolute;
+            right: -5px;
+            top: -10px;
+            color: var(--accent-green);
+        }
+
+        .ipc-signal-name {
+            font-size: 0.8rem;
+            color: var(--accent-orange);
+            margin-top: 0.3rem;
+            font-family: monospace;
+        }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+            padding: 1rem;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+        }
+
+        /* SVG Styles for embedded diagrams */
+        svg text {
+            fill: var(--text-primary);
+            font-family: inherit;
+        }
+
+        svg .node {
+            fill: var(--bg-secondary);
+            stroke: var(--border-color);
+            stroke-width: 2;
+        }
+
+        svg .arrow-line {
+            stroke: var(--accent-blue);
+            stroke-width: 2;
+            fill: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            body {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            .layer {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .component-box {
+                width: 100%;
+                max-width: 100%;
+            }
+
+            .data-flow {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔭 ScopeDome Watchdog Architecture</h1>
+        <p>Comprehensive documentation of the automated dome recovery system for observatory automation.</p>
+
+        <!-- Overview Section -->
+        <div class="section">
+            <h2>System Overview</h2>
+            <p>ScopeDome Watchdog is a multi-component system designed to automatically recover from dome connectivity failures. It monitors the dome controller, performs power-cycle recovery via smart plugs, and integrates with N.I.N.A. for seamless imaging session continuity.</p>
+            
+            <div class="architecture-diagram">
+                <!-- Application Layer -->
+                <div class="layer">
+                    <div class="component-box nina-plugin">
+                        <span class="badge plugin">Plugin</span>
+                        <div class="component-title">ScopeDomeWatchdog.Nina</div>
+                        <div class="component-desc">N.I.N.A. plugin with sequence trigger for pause/resume during reconnection</div>
+                    </div>
+                    <div class="component-box tray-app">
+                        <span class="badge wpf">WPF</span>
+                        <div class="component-title">ScopeDomeWatchdog.Tray</div>
+                        <div class="component-desc">System tray watchdog with UI dashboard, settings, and health monitoring</div>
+                    </div>
+                    <div class="component-box trigger">
+                        <span class="badge cli">CLI</span>
+                        <div class="component-title">ScopeDomeWatchdog.Trigger</div>
+                        <div class="component-desc">Command-line tool for external restart triggering</div>
+                    </div>
+                </div>
+
+                <div class="connectors">
+                    <div class="arrow bidirectional">Events & Services</div>
+                </div>
+
+                <!-- Core Library -->
+                <div class="layer">
+                    <div class="component-box core-lib" style="min-width: 400px;">
+                        <span class="badge dll">DLL</span>
+                        <div class="component-title">ScopeDomeWatchdog.Core</div>
+                        <div class="component-desc">Shared library containing all business logic: watchdog runner, restart sequence, ASCOM interop, Shelly control, encoder/switch caching</div>
+                    </div>
+                </div>
+
+                <div class="connectors">
+                    <div class="arrow">HTTP/COM</div>
+                </div>
+
+                <!-- External Systems -->
+                <div class="layer">
+                    <div class="component-box external">
+                        <div class="component-title">Shelly Smart Plug</div>
+                        <div class="component-desc">Power cycling via REST API</div>
+                    </div>
+                    <div class="component-box external">
+                        <div class="component-title">ASCOM Dome Driver</div>
+                        <div class="component-desc">ScopeDome USB Dome COM interface</div>
+                    </div>
+                    <div class="component-box external">
+                        <div class="component-title">ASCOM Switch</div>
+                        <div class="component-desc">Fan/heater control via COM</div>
+                    </div>
+                    <div class="component-box external">
+                        <div class="component-title">ScopeDome HTTP</div>
+                        <div class="component-desc">Direct encoder value access</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: var(--accent-purple);"></div>
+                    <span>NINA Plugin (MPL-2.0)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: var(--accent-blue);"></div>
+                    <span>WPF Application (MIT)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: var(--accent-green);"></div>
+                    <span>Core Library (MIT)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: var(--accent-orange);"></div>
+                    <span>External Systems</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recovery Pipeline -->
+        <div class="section">
+            <h2>Recovery Pipeline</h2>
+            <p>The complete sequence from dome failure detection to successful recovery and imaging resumption.</p>
+
+            <div class="pipeline">
+                <div class="pipeline-step">
+                    <div class="step-number">
+                        <div class="step-circle">1</div>
+                        <div class="step-line"></div>
+                    </div>
+                    <div class="step-content">
+                        <div class="step-title">Connectivity Monitoring</div>
+                        <div class="step-detail">WatchdogRunner sends ICMP pings to dome IP every second. Tracks latency in rolling 60-sample window.</div>
+                        <div class="step-component">WatchdogRunner.LoopAsync()</div>
+                    </div>
+                </div>
+
+                <div class="pipeline-step">
+                    <div class="step-number">
+                        <div class="step-circle">2</div>
+                        <div class="step-line"></div>
+                    </div>
+                    <div class="step-content">
+                        <div class="step-title">Failure Detection</div>
+                        <div class="step-detail">After 5 consecutive ping failures (configurable), triggers restart sequence. Respects cooldown period between restarts.</div>
+                        <div class="step-component">_failCount >= FailsToTrigger</div>
+                    </div>
+                </div>
+
+                <div class="pipeline-step">
+                    <div class="step-number">
+                        <div class="step-circle">3</div>
+                        <div class="step-line"></div>
+                    </div>
+                    <div class="step-content">
+                        <div class="step-title">Signal NINA Plugin</div>
+                        <div class="step-detail">Sets Windows named event <code>Global\ScopeDome_ReconnectionStarted</code> to pause imaging sequence.</div>
+                        <div class="step-component">INinaPluginService.SignalReconnectionStartAsync()</div>
+                    </div>
+                </div>
+
+                <div class="pipeline-step">
+                    <div class="step-number">
+                        <div class="step-circle">4</div>
+                        <div class="step-line"></div>
+                    </div>
+                    <div class="step-content">
+                        <div class="step-title">Stop Dome Process</div>
+                        <div class="step-detail">Gracefully terminates ASCOM.ScopeDomeUSBDome.exe process before power cycle.</div>
+                        <div class="step-component">RestartSequenceService.StopDomeProcessBestEffort()</div>
+                    </div>
+                </div>
+
+                <div class="pipeline-step">
+                    <div class="step-number">
+                        <div class="step-circle">5</div>
+                        <div class="step-line"></div>
+                    </div>
+                    <div class="step-content">
+                        <div class="step-title">Power Cycle</div>
+                        <div class="step-detail">Calls Shelly REST API to turn OFF → wait 15s → turn ON the dome power. Waits 30s for hardware boot.</div>
+                        <div class="step-component">ShellyClient.SetSwitchAsync()</div>
+                    </div>
+                </div>
+
+                <div class="pipeline-step">
+                    <div class="step-number">
+                        <div class="step-circle">6</div>
+                        <div class="step-line"></div>
+                    </div>
+                    <div class="step-content">
+                        <div class="step-title">Write Cached Encoder (Optional)</div>
+                        <div class="step-detail">If configured, writes cached azimuth encoder value via HTTP to skip FindHome operation.</div>
+                        <div class="step-component">ScopeDomeHttpClient.WriteEncoderAsync()</div>
+                    </div>
+                </div>
+
+                <div class="pipeline-step">
+                    <div class="step-number">
+                        <div class="step-circle">7</div>
+                        <div class="step-line"></div>
+                    </div>
+                    <div class="step-content">
+                        <div class="step-title">Start Dome Process</div>
+                        <div class="step-detail">Launches ASCOM dome driver executable and waits for initialization.</div>
+                        <div class="step-component">RestartSequenceService.StartDomeProcessBestEffort()</div>
+                    </div>
+                </div>
+
+                <div class="pipeline-step">
+                    <div class="step-number">
+                        <div class="step-circle">8</div>
+                        <div class="step-line"></div>
+                    </div>
+                    <div class="step-content">
+                        <div class="step-title">ASCOM Connect</div>
+                        <div class="step-detail">Creates COM object for dome driver, sets Connected=true with retry logic (up to 3 minutes timeout).</div>
+                        <div class="step-component">RestartSequenceService.RunAscomSequenceAsync()</div>
+                    </div>
+                </div>
+
+                <div class="pipeline-step">
+                    <div class="step-number">
+                        <div class="step-circle">9</div>
+                        <div class="step-line"></div>
+                    </div>
+                    <div class="step-content">
+                        <div class="step-title">FindHome / Restore Switches</div>
+                        <div class="step-detail">If AutoHome mode: waits for FindHome to complete. Restores cached switch states (fan, heater) via ASCOM Switch interface.</div>
+                        <div class="step-component">SwitchStateCacheService.RestoreStatesAsync()</div>
+                    </div>
+                </div>
+
+                <div class="pipeline-step">
+                    <div class="step-number">
+                        <div class="step-circle">10</div>
+                        <div class="step-line"></div>
+                    </div>
+                    <div class="step-content">
+                        <div class="step-title">Signal Completion</div>
+                        <div class="step-detail">Sets <code>Global\ScopeDome_ReconnectionComplete</code> event. NINA plugin resumes sequence from same position.</div>
+                        <div class="step-component">INinaPluginService.SignalReconnectionCompleteAsync()</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Core Services -->
+        <div class="section">
+            <h2>Core Library Services</h2>
+            <p>The ScopeDomeWatchdog.Core library contains all shared business logic used by both the tray app and NINA plugin.</p>
+
+            <div class="service-grid">
+                <div class="service-card">
+                    <h4>WatchdogRunner</h4>
+                    <p>Main orchestrator running two background loops:</p>
+                    <p>• <strong>Ping Loop:</strong> Monitors dome connectivity, triggers restart on failures</p>
+                    <p>• <strong>Switch Cache Loop:</strong> Periodically reads ASCOM switch states every 30s</p>
+                    <p>File: <code>WatchdogRunner.cs</code></p>
+                </div>
+
+                <div class="service-card">
+                    <h4>RestartSequenceService</h4>
+                    <p>Executes the complete restart sequence:</p>
+                    <p>• Stop dome process → Power cycle → Start process → ASCOM connect → FindHome</p>
+                    <p>• Uses mutex to prevent concurrent restarts</p>
+                    <p>File: <code>RestartSequenceService.cs</code></p>
+                </div>
+
+                <div class="service-card">
+                    <h4>ShellyClient</h4>
+                    <p>HTTP client for Shelly smart plug control:</p>
+                    <p>• <code>GetSwitchOutputAsync()</code> - Read current state</p>
+                    <p>• <code>SetSwitchAsync()</code> - Turn on/off</p>
+                    <p>• <code>EnumerateRelaysAsync()</code> - List available relays</p>
+                    <p>File: <code>ShellyClient.cs</code></p>
+                </div>
+
+                <div class="service-card">
+                    <h4>ScopeDomeEncoderCacheService</h4>
+                    <p>Continuously caches dome azimuth encoder value:</p>
+                    <p>• Polls dome HTTP API at configurable interval</p>
+                    <p>• Pauses during restart sequence</p>
+                    <p>• Persists value to config file</p>
+                    <p>File: <code>ScopeDomeEncoderCacheService.cs</code></p>
+                </div>
+
+                <div class="service-card">
+                    <h4>SwitchStateCacheService</h4>
+                    <p>Caches and restores ASCOM switch states:</p>
+                    <p>• Reads selected switch states every 30s</p>
+                    <p>• Stores <code>CachedSwitchState</code> with name, value, timestamp</p>
+                    <p>• Restores states after dome reconnection</p>
+                    <p>File: <code>SwitchStateCacheService.cs</code></p>
+                </div>
+
+                <div class="service-card">
+                    <h4>ScopeDomeHttpClient</h4>
+                    <p>Direct HTTP communication with dome controller:</p>
+                    <p>• <code>ReadEncoderAsync()</code> - Get current azimuth</p>
+                    <p>• <code>WriteEncoderAsync()</code> - Set encoder value</p>
+                    <p>• Supports Basic Auth for protected endpoints</p>
+                    <p>File: <code>ScopeDomeHttpClient.cs</code></p>
+                </div>
+
+                <div class="service-card">
+                    <h4>AscomConnectionTester</h4>
+                    <p>Tests ASCOM device connectivity:</p>
+                    <p>• Creates COM object via ProgID</p>
+                    <p>• Verifies Connected property</p>
+                    <p>• Runs on STA thread via StaTaskRunner</p>
+                    <p>File: <code>AscomConnectionTester.cs</code></p>
+                </div>
+
+                <div class="service-card">
+                    <h4>ConfigService</h4>
+                    <p>Configuration management:</p>
+                    <p>• Loads/saves <code>WatchdogConfig</code> from JSON</p>
+                    <p>• Default path: <code>%APPDATA%\ScopeDomeWatchdog\config.json</code></p>
+                    <p>File: <code>ConfigService.cs</code></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inter-Process Communication -->
+        <div class="section">
+            <h2>Inter-Process Communication</h2>
+            <p>The tray app and NINA plugin communicate via Windows named events for cross-process signaling.</p>
+
+            <div class="ipc-diagram">
+                <div class="ipc-row">
+                    <div class="ipc-process" style="border-color: var(--accent-blue);">
+                        <strong>Tray App</strong><br>
+                        <small>WatchdogRunner</small>
+                    </div>
+                    <div class="ipc-signal">
+                        <div class="ipc-signal-line"></div>
+                        <div class="ipc-signal-name">Global\ScopeDome_ReconnectionStarted</div>
+                    </div>
+                    <div class="ipc-process" style="border-color: var(--accent-purple);">
+                        <strong>NINA Plugin</strong><br>
+                        <small>DomeReconnectionTrigger</small>
+                    </div>
+                </div>
+
+                <div style="text-align: center; color: var(--text-secondary); padding: 1rem;">
+                    ↓ Plugin cancels sequence via <code>CancelAdvancedSequence()</code> ↓
+                </div>
+
+                <div class="ipc-row">
+                    <div class="ipc-process" style="border-color: var(--accent-blue);">
+                        <strong>Tray App</strong><br>
+                        <small>RestartSequenceService</small>
+                    </div>
+                    <div class="ipc-signal">
+                        <div class="ipc-signal-line"></div>
+                        <div class="ipc-signal-name">Global\ScopeDome_ReconnectionComplete</div>
+                    </div>
+                    <div class="ipc-process" style="border-color: var(--accent-purple);">
+                        <strong>NINA Plugin</strong><br>
+                        <small>DomeReconnectionTrigger</small>
+                    </div>
+                </div>
+
+                <div style="text-align: center; color: var(--text-secondary); padding: 1rem;">
+                    ↓ Plugin resumes sequence via <code>StartAdvancedSequence(true)</code> ↓
+                </div>
+            </div>
+
+            <h3>Event Flow Details</h3>
+            <table class="config-table">
+                <tr>
+                    <th>Event Name</th>
+                    <th>Producer</th>
+                    <th>Consumer</th>
+                    <th>Purpose</th>
+                </tr>
+                <tr>
+                    <td><code>Global\ScopeDome_ReconnectionStarted</code></td>
+                    <td>RestartSequenceService</td>
+                    <td>DomeReconnectionTrigger</td>
+                    <td>Signals dome is offline, pause imaging</td>
+                </tr>
+                <tr>
+                    <td><code>Global\ScopeDome_ReconnectionComplete</code></td>
+                    <td>RestartSequenceService</td>
+                    <td>DomeReconnectionTrigger</td>
+                    <td>Signals dome is back online, resume imaging</td>
+                </tr>
+                <tr>
+                    <td><code>Global\ScopeDomeWatchdog_ManualTrigger</code></td>
+                    <td>External (CLI/UI)</td>
+                    <td>WatchdogRunner</td>
+                    <td>Manually trigger a restart sequence</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- NINA Plugin Architecture -->
+        <div class="section">
+            <h2>NINA Plugin Architecture</h2>
+            <p>The DomeReconnectionTrigger integrates with N.I.N.A.'s sequence system using the ConditionWatchdog pattern.</p>
+
+            <div class="data-flow">
+                <div class="flow-node" style="border-color: var(--accent-purple);">
+                    <strong>ConditionWatchdog</strong><br>
+                    <small>Polls every 5s</small>
+                </div>
+                <div class="flow-arrow">
+                    <span>→</span>
+                    Check Event
+                </div>
+                <div class="flow-node" style="border-color: var(--accent-orange);">
+                    <strong>EventWaitHandle</strong><br>
+                    <small>Named events</small>
+                </div>
+                <div class="flow-arrow">
+                    <span>→</span>
+                    If signaled
+                </div>
+                <div class="flow-node" style="border-color: var(--accent-green);">
+                    <strong>InterruptWhenReconnecting</strong><br>
+                    <small>Returns true to interrupt</small>
+                </div>
+                <div class="flow-arrow">
+                    <span>→</span>
+                    Execute
+                </div>
+                <div class="flow-node" style="border-color: var(--accent-blue);">
+                    <strong>SequenceMediator</strong><br>
+                    <small>Cancel/Start sequence</small>
+                </div>
+            </div>
+
+            <h3>Plugin Components</h3>
+            <div class="service-grid">
+                <div class="service-card">
+                    <h4>DomeReconnectionTrigger</h4>
+                    <p>Main trigger class implementing <code>ISequenceTrigger</code>:</p>
+                    <p>• Exports metadata for NINA plugin discovery</p>
+                    <p>• Uses static state for cross-clone synchronization</p>
+                    <p>• Configurable timeout (default 10 minutes)</p>
+                </div>
+
+                <div class="service-card">
+                    <h4>TriggerInstructionContainer</h4>
+                    <p>Container for post-reconnection instructions:</p>
+                    <p>• Allows users to add actions after dome recovery</p>
+                    <p>• Example: Center on target, resync mount</p>
+                </div>
+
+                <div class="service-card">
+                    <h4>ScopeDomeWatchdogPlugin</h4>
+                    <p>Plugin entry point implementing <code>IPlugin</code>:</p>
+                    <p>• Registers with NINA plugin system via MEF</p>
+                    <p>• Provides plugin metadata and options UI</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Configuration -->
+        <div class="section">
+            <h2>Configuration Model</h2>
+            <p>The <code>WatchdogConfig</code> class defines all configurable parameters, stored in <code>%APPDATA%\ScopeDomeWatchdog\config.json</code>.</p>
+
+            <h3>Connectivity Settings</h3>
+            <table class="config-table">
+                <tr>
+                    <th>Property</th>
+                    <th>Type</th>
+                    <th>Default</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td><code>MonitorIp</code></td>
+                    <td>string</td>
+                    <td>192.168.6.100</td>
+                    <td>IP address of dome controller to ping</td>
+                </tr>
+                <tr>
+                    <td><code>PingIntervalSec</code></td>
+                    <td>int</td>
+                    <td>1</td>
+                    <td>Seconds between ping attempts</td>
+                </tr>
+                <tr>
+                    <td><code>PingTimeoutMs</code></td>
+                    <td>int</td>
+                    <td>900</td>
+                    <td>Ping timeout in milliseconds</td>
+                </tr>
+                <tr>
+                    <td><code>FailsToTrigger</code></td>
+                    <td>int</td>
+                    <td>5</td>
+                    <td>Consecutive failures before restart</td>
+                </tr>
+            </table>
+
+            <h3>Power Control Settings</h3>
+            <table class="config-table">
+                <tr>
+                    <th>Property</th>
+                    <th>Type</th>
+                    <th>Default</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td><code>PlugIp</code></td>
+                    <td>string</td>
+                    <td>192.168.61.45</td>
+                    <td>Shelly smart plug IP address</td>
+                </tr>
+                <tr>
+                    <td><code>SwitchId</code></td>
+                    <td>int</td>
+                    <td>0</td>
+                    <td>Relay index on multi-relay devices</td>
+                </tr>
+                <tr>
+                    <td><code>OffSeconds</code></td>
+                    <td>int</td>
+                    <td>15</td>
+                    <td>Duration to keep power off during cycle</td>
+                </tr>
+                <tr>
+                    <td><code>CooldownSeconds</code></td>
+                    <td>int</td>
+                    <td>120</td>
+                    <td>Minimum time between restart sequences</td>
+                </tr>
+            </table>
+
+            <h3>ASCOM Settings</h3>
+            <table class="config-table">
+                <tr>
+                    <th>Property</th>
+                    <th>Type</th>
+                    <th>Default</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td><code>AscomDomeProgId</code></td>
+                    <td>string</td>
+                    <td>ASCOM.ScopeDomeUSBDome.DomeLS</td>
+                    <td>COM ProgID for dome driver</td>
+                </tr>
+                <tr>
+                    <td><code>AscomSwitchProgId</code></td>
+                    <td>string</td>
+                    <td>ASCOM.ScopeDomeUSBDome.DomeLS.Switch</td>
+                    <td>COM ProgID for switch driver</td>
+                </tr>
+                <tr>
+                    <td><code>MonitoredSwitches</code></td>
+                    <td>List&lt;MonitoredSwitch&gt;</td>
+                    <td>[]</td>
+                    <td>Switches to cache and restore</td>
+                </tr>
+                <tr>
+                    <td><code>HomeActionMode</code></td>
+                    <td>enum</td>
+                    <td>AutoHome</td>
+                    <td>AutoHome or WriteCachedEncoder</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Data Flow Diagram -->
+        <div class="section">
+            <h2>Data Flow During Recovery</h2>
+            <p>Visualization of data and control flow during a typical dome recovery scenario.</p>
+
+            <svg viewBox="0 0 1000 500" style="width: 100%; height: auto; max-height: 500px;">
+                <!-- Background -->
+                <rect width="1000" height="500" fill="var(--bg-tertiary)" rx="8"/>
+                
+                <!-- Tray App Box -->
+                <rect x="50" y="30" width="200" height="80" rx="8" fill="var(--bg-secondary)" stroke="var(--accent-blue)" stroke-width="2"/>
+                <text x="150" y="60" text-anchor="middle" font-size="14" font-weight="bold">Tray Application</text>
+                <text x="150" y="80" text-anchor="middle" font-size="11" fill="var(--text-secondary)">WatchdogRunner</text>
+                <text x="150" y="95" text-anchor="middle" font-size="11" fill="var(--text-secondary)">RestartSequenceService</text>
+
+                <!-- NINA Plugin Box -->
+                <rect x="750" y="30" width="200" height="80" rx="8" fill="var(--bg-secondary)" stroke="var(--accent-purple)" stroke-width="2"/>
+                <text x="850" y="60" text-anchor="middle" font-size="14" font-weight="bold">NINA Plugin</text>
+                <text x="850" y="80" text-anchor="middle" font-size="11" fill="var(--text-secondary)">DomeReconnectionTrigger</text>
+                <text x="850" y="95" text-anchor="middle" font-size="11" fill="var(--text-secondary)">ConditionWatchdog</text>
+
+                <!-- Named Event -->
+                <rect x="350" y="50" width="300" height="40" rx="4" fill="var(--bg-primary)" stroke="var(--accent-green)" stroke-width="2"/>
+                <text x="500" y="75" text-anchor="middle" font-size="12" fill="var(--accent-green)">Global\ScopeDome_Reconnection*</text>
+
+                <!-- Arrows to Named Event -->
+                <path d="M250 70 L350 70" stroke="var(--accent-blue)" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+                <path d="M650 70 L750 70" stroke="var(--accent-purple)" stroke-width="2" fill="none" marker-start="url(#arrowhead-left)"/>
+
+                <!-- Shelly Box -->
+                <rect x="50" y="180" width="150" height="60" rx="8" fill="var(--bg-secondary)" stroke="var(--accent-orange)" stroke-width="2"/>
+                <text x="125" y="205" text-anchor="middle" font-size="13" font-weight="bold">Shelly Plug</text>
+                <text x="125" y="225" text-anchor="middle" font-size="11" fill="var(--text-secondary)">REST API</text>
+
+                <!-- Dome Controller Box -->
+                <rect x="250" y="180" width="150" height="60" rx="8" fill="var(--bg-secondary)" stroke="var(--accent-orange)" stroke-width="2"/>
+                <text x="325" y="205" text-anchor="middle" font-size="13" font-weight="bold">Dome Controller</text>
+                <text x="325" y="225" text-anchor="middle" font-size="11" fill="var(--text-secondary)">ScopeDome USB</text>
+
+                <!-- ASCOM Box -->
+                <rect x="450" y="180" width="150" height="60" rx="8" fill="var(--bg-secondary)" stroke="var(--accent-orange)" stroke-width="2"/>
+                <text x="525" y="205" text-anchor="middle" font-size="13" font-weight="bold">ASCOM Dome</text>
+                <text x="525" y="225" text-anchor="middle" font-size="11" fill="var(--text-secondary)">COM Interface</text>
+
+                <!-- Switch Box -->
+                <rect x="650" y="180" width="150" height="60" rx="8" fill="var(--bg-secondary)" stroke="var(--accent-orange)" stroke-width="2"/>
+                <text x="725" y="205" text-anchor="middle" font-size="13" font-weight="bold">ASCOM Switch</text>
+                <text x="725" y="225" text-anchor="middle" font-size="11" fill="var(--text-secondary)">Fan/Heater</text>
+
+                <!-- Arrows from Tray to external -->
+                <path d="M150 110 L125 180" stroke="var(--accent-blue)" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+                <path d="M150 110 L325 180" stroke="var(--accent-blue)" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+                <path d="M150 110 L525 180" stroke="var(--accent-blue)" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+                <path d="M150 110 L725 180" stroke="var(--accent-blue)" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+
+                <!-- Sequence Timeline -->
+                <text x="500" y="300" text-anchor="middle" font-size="14" font-weight="bold" fill="var(--text-primary)">Recovery Timeline</text>
+                
+                <!-- Timeline bar -->
+                <rect x="50" y="320" width="900" height="8" rx="4" fill="var(--bg-primary)"/>
+                
+                <!-- Timeline steps -->
+                <circle cx="100" cy="324" r="12" fill="var(--accent-red)"/>
+                <text x="100" y="360" text-anchor="middle" font-size="10" fill="var(--text-secondary)">Detect</text>
+                <text x="100" y="375" text-anchor="middle" font-size="10" fill="var(--text-secondary)">Failure</text>
+
+                <circle cx="220" cy="324" r="12" fill="var(--accent-orange)"/>
+                <text x="220" y="360" text-anchor="middle" font-size="10" fill="var(--text-secondary)">Signal</text>
+                <text x="220" y="375" text-anchor="middle" font-size="10" fill="var(--text-secondary)">NINA</text>
+
+                <circle cx="340" cy="324" r="12" fill="var(--accent-orange)"/>
+                <text x="340" y="360" text-anchor="middle" font-size="10" fill="var(--text-secondary)">Power</text>
+                <text x="340" y="375" text-anchor="middle" font-size="10" fill="var(--text-secondary)">OFF</text>
+
+                <circle cx="460" cy="324" r="12" fill="var(--accent-orange)"/>
+                <text x="460" y="360" text-anchor="middle" font-size="10" fill="var(--text-secondary)">Power</text>
+                <text x="460" y="375" text-anchor="middle" font-size="10" fill="var(--text-secondary)">ON</text>
+
+                <circle cx="580" cy="324" r="12" fill="var(--accent-blue)"/>
+                <text x="580" y="360" text-anchor="middle" font-size="10" fill="var(--text-secondary)">ASCOM</text>
+                <text x="580" y="375" text-anchor="middle" font-size="10" fill="var(--text-secondary)">Connect</text>
+
+                <circle cx="700" cy="324" r="12" fill="var(--accent-blue)"/>
+                <text x="700" y="360" text-anchor="middle" font-size="10" fill="var(--text-secondary)">FindHome</text>
+                <text x="700" y="375" text-anchor="middle" font-size="10" fill="var(--text-secondary)">/Restore</text>
+
+                <circle cx="820" cy="324" r="12" fill="var(--accent-green)"/>
+                <text x="820" y="360" text-anchor="middle" font-size="10" fill="var(--text-secondary)">Signal</text>
+                <text x="820" y="375" text-anchor="middle" font-size="10" fill="var(--text-secondary)">Complete</text>
+
+                <circle cx="900" cy="324" r="12" fill="var(--accent-green)"/>
+                <text x="900" y="360" text-anchor="middle" font-size="10" fill="var(--text-secondary)">Resume</text>
+                <text x="900" y="375" text-anchor="middle" font-size="10" fill="var(--text-secondary)">Imaging</text>
+
+                <!-- Time annotations -->
+                <text x="280" y="410" text-anchor="middle" font-size="9" fill="var(--text-secondary)">~5s</text>
+                <text x="400" y="410" text-anchor="middle" font-size="9" fill="var(--text-secondary)">15s</text>
+                <text x="520" y="410" text-anchor="middle" font-size="9" fill="var(--text-secondary)">30s</text>
+                <text x="640" y="410" text-anchor="middle" font-size="9" fill="var(--text-secondary)">~3min</text>
+                <text x="760" y="410" text-anchor="middle" font-size="9" fill="var(--text-secondary)">~15min</text>
+
+                <!-- Arrow markers -->
+                <defs>
+                    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="var(--accent-blue)"/>
+                    </marker>
+                    <marker id="arrowhead-left" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+                        <polygon points="10 0, 0 3.5, 10 7" fill="var(--accent-purple)"/>
+                    </marker>
+                </defs>
+            </svg>
+        </div>
+
+        <!-- Technology Stack -->
+        <div class="section">
+            <h2>Technology Stack</h2>
+            
+            <div class="service-grid">
+                <div class="service-card">
+                    <h4>Runtime</h4>
+                    <p>.NET 8.0 (Windows Desktop)</p>
+                    <p>WPF for UI components</p>
+                    <p>STA threading for COM interop</p>
+                </div>
+
+                <div class="service-card">
+                    <h4>ASCOM Integration</h4>
+                    <p>Late-bound COM via <code>Type.GetTypeFromProgID()</code></p>
+                    <p>Dynamic dispatch for driver calls</p>
+                    <p>StaTaskRunner for thread safety</p>
+                </div>
+
+                <div class="service-card">
+                    <h4>NINA Integration</h4>
+                    <p>MEF (Managed Extensibility Framework)</p>
+                    <p>NINA.Plugin SDK 3.2.x</p>
+                    <p>ConditionWatchdog pattern</p>
+                </div>
+
+                <div class="service-card">
+                    <h4>Communication</h4>
+                    <p>HTTP/REST for Shelly & ScopeDome</p>
+                    <p>Windows Named Events for IPC</p>
+                    <p>System.Text.Json for serialization</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align: center; padding: 2rem; color: var(--text-secondary); font-size: 0.9rem;">
+            <p>ScopeDome Watchdog v0.2 | Documentation generated February 2026</p>
+            <p>Core Library & Tray App: MIT License | NINA Plugin: MPL-2.0</p>
+        </div>
+    </div>
+</body>
+</html>
