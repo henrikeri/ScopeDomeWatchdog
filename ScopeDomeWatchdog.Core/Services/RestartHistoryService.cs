@@ -105,6 +105,25 @@ public sealed class RestartHistoryService
         }
     }
 
+    public void ClearHistory()
+    {
+        lock (_sync)
+        {
+            _cachedHistory = new List<RestartHistoryEntry>();
+            try
+            {
+                if (File.Exists(_historyPath))
+                {
+                    File.Delete(_historyPath);
+                }
+            }
+            catch
+            {
+                // Swallow errors to avoid disrupting operations
+            }
+        }
+    }
+
     private List<RestartHistoryEntry> LoadHistory()
     {
         if (_cachedHistory != null)

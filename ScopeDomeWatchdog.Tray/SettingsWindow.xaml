@@ -226,6 +226,15 @@
                         </Grid>
                     </StackPanel>
                 </Border>
+
+                <!-- Restart History -->
+                <Border Background="{StaticResource SurfaceColor}" BorderThickness="1" CornerRadius="4" Padding="12">
+                    <StackPanel>
+                        <TextBlock Text="Restart History" FontWeight="Bold" FontSize="14" Margin="0,0,0,12" />
+                        <TextBlock Text="Clear all recorded restart history and reset the restart count." FontSize="11" Foreground="{StaticResource TextMutedColor}" Margin="0,0,0,12" />
+                        <Button Width="180" Content="Clear Restart History" Click="ClearRestartHistoryButton_Click" Background="{StaticResource ErrorColor}" Foreground="White" Padding="8,6" />
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </ScrollViewer>
 

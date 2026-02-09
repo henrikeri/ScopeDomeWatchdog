@@ -20,11 +20,13 @@ public partial class SettingsWindow : Window
     private readonly StaTaskRunner _staRunner = new("StaSettings");
     private readonly AscomProfileService _profileService = new();
     private readonly AscomSwitchEnumerator _switchEnumerator;
+    private readonly RestartSequenceService? _restartService;
     private WatchdogConfig? _config;
 
-    public SettingsWindow(string configPath)
+    public SettingsWindow(string configPath, RestartSequenceService? restartService = null)
     {
         _configPath = configPath;
+        _restartService = restartService;
         _switchEnumerator = new AscomSwitchEnumerator(_staRunner);
         InitializeComponent();
         WindowChromeHelper.ApplyDarkTitleBar(this);
@@ -295,6 +297,30 @@ public partial class SettingsWindow : Window
     private void CloseButton_Click(object sender, RoutedEventArgs e)
     {
         Close();
+    }
+
+    private void ClearRestartHistoryButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_restartService == null)
+        {
+            WpfMessageBox.Show(this, "Restart history service not available", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+
+        var result = WpfMessageBox.Show(this, "Clear all restart history? This cannot be undone.", "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (result != MessageBoxResult.Yes)
+            return;
+
+        try
+        {
+            var historyService = _restartService.GetHistoryService;
+            historyService.ClearHistory();
+            WpfMessageBox.Show(this, "Restart history cleared successfully", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            WpfMessageBox.Show(this, $"Failed to clear history: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     protected override void OnClosed(EventArgs e)

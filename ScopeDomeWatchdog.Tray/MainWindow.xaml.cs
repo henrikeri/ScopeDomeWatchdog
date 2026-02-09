@@ -89,7 +89,7 @@ public partial class MainWindow : Window
 
     public void OpenSettings()
     {
-        var settings = new SettingsWindow(_configPath);
+        var settings = new SettingsWindow(_configPath, _restartService);
         settings.Owner = this;
         settings.ShowDialog();
 
