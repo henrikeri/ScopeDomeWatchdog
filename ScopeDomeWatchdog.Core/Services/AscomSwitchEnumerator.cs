@@ -38,32 +38,32 @@ public sealed class AscomSwitchEnumerator
                 for (var i = 0; i < maxSwitch; i++)
                 {
                     string name;
-                    try { name = (string)sw.GetType().InvokeMember("GetSwitchName", System.Reflection.BindingFlags.InvokeMethod, null, sw, new object[] { i }); }
+                    try { name = (string)sw.GetType().InvokeMember("GetSwitchName", System.Reflection.BindingFlags.InvokeMethod, null, sw, new object[] { i })!; }
                     catch { name = string.Empty; }
 
                     bool? canWrite = null;
-                    try { canWrite = (bool)sw.GetType().InvokeMember("CanWrite", System.Reflection.BindingFlags.InvokeMethod, null, sw, new object[] { i }); }
+                    try { canWrite = (bool)sw.GetType().InvokeMember("CanWrite", System.Reflection.BindingFlags.InvokeMethod, null, sw, new object[] { i })!; }
                     catch { }
 
                     bool? state = null;
-                    try { state = (bool)sw.GetType().InvokeMember("GetSwitch", System.Reflection.BindingFlags.InvokeMethod, null, sw, new object[] { i }); }
+                    try { state = (bool)sw.GetType().InvokeMember("GetSwitch", System.Reflection.BindingFlags.InvokeMethod, null, sw, new object[] { i })!; }
                     catch { }
 
                     double? value = null;
-                    try { value = (double)sw.GetType().InvokeMember("GetSwitchValue", System.Reflection.BindingFlags.InvokeMethod, null, sw, new object[] { i }); }
+                    try { value = (double)sw.GetType().InvokeMember("GetSwitchValue", System.Reflection.BindingFlags.InvokeMethod, null, sw, new object[] { i })!; }
                     catch { }
 
                     results.Add(new AscomSwitchInfo
                     {
                         Index = i,
-                        Name = name,
+                        Name = name!,
                         CanWrite = canWrite,
                         State = state,
                         Value = value
                     });
                 }
 
-                return (IReadOnlyList<AscomSwitchInfo>)results;
+                return results;
             }
             finally
             {

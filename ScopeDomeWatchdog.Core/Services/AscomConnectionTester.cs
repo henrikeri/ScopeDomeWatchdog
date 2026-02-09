@@ -59,7 +59,7 @@ public sealed class AscomConnectionTester
             }
 
             obj.GetType().InvokeMember("Connected", System.Reflection.BindingFlags.SetProperty, null, obj, new object[] { true });
-            var connected = (bool)obj.GetType().InvokeMember("Connected", System.Reflection.BindingFlags.GetProperty, null, obj, Array.Empty<object>());
+            var connected = (bool)obj.GetType().InvokeMember("Connected", System.Reflection.BindingFlags.GetProperty, null, obj, Array.Empty<object>())!;
             return $"{label} '{progId}': Connected={connected}. ";
         }
         catch (Exception ex)

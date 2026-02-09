@@ -27,7 +27,7 @@ public sealed class AscomProfileService
                 System.Reflection.BindingFlags.InvokeMethod,
                 null,
                 profile,
-                new object[] { deviceType });
+                new object[] { deviceType })!;
 
             foreach (var device in devices)
             {
@@ -37,12 +37,12 @@ public sealed class AscomProfileService
                 try
                 {
                     // Each item is a COM Key/Value pair - use InvokeMember to access properties
-                    var progId = (string?)device.GetType().InvokeMember(
+                    var progId = (string)device.GetType().InvokeMember(
                         "Key",
                         System.Reflection.BindingFlags.GetProperty,
                         null,
                         device,
-                        null) ?? string.Empty;
+                        null)! ?? string.Empty;
                         
                     var name = (string?)device.GetType().InvokeMember(
                         "Value",

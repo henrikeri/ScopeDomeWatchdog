@@ -271,7 +271,7 @@ public sealed class RestartSequenceService : IDisposable
                 }
 
                 obj.GetType().InvokeMember("Connected", System.Reflection.BindingFlags.SetProperty, null, obj, new object[] { true });
-                var connected = (bool)obj.GetType().InvokeMember("Connected", System.Reflection.BindingFlags.GetProperty, null, obj, Array.Empty<object>());
+                var connected = (bool)obj.GetType().InvokeMember("Connected", System.Reflection.BindingFlags.GetProperty, null, obj, Array.Empty<object>())!;
                 if (!connected)
                 {
                     throw new InvalidOperationException("Connected remained false");
@@ -306,7 +306,7 @@ public sealed class RestartSequenceService : IDisposable
 
         try
         {
-            var canFindHome = (bool)dome.GetType().InvokeMember("CanFindHome", System.Reflection.BindingFlags.GetProperty, null, dome, Array.Empty<object>());
+            var canFindHome = (bool)dome.GetType().InvokeMember("CanFindHome", System.Reflection.BindingFlags.GetProperty, null, dome, Array.Empty<object>())!;
             if (!canFindHome)
             {
                 throw new InvalidOperationException("Driver reports CanFindHome=false");
@@ -319,7 +319,7 @@ public sealed class RestartSequenceService : IDisposable
 
         try
         {
-            var atHome = (bool)dome.GetType().InvokeMember("AtHome", System.Reflection.BindingFlags.GetProperty, null, dome, Array.Empty<object>());
+            var atHome = (bool)dome.GetType().InvokeMember("AtHome", System.Reflection.BindingFlags.GetProperty, null, dome, Array.Empty<object>())!;
             if (atHome)
             {
                 Log(logWriter, "Dome already at home (AtHome=true); skipping FindHome.");
@@ -346,12 +346,12 @@ public sealed class RestartSequenceService : IDisposable
             bool? atHome = null;
             double? az = null;
 
-            try { slewing = (bool)dome.GetType().InvokeMember("Slewing", System.Reflection.BindingFlags.GetProperty, null, dome, Array.Empty<object>()); } catch { }
+            try { slewing = (bool)dome.GetType().InvokeMember("Slewing", System.Reflection.BindingFlags.GetProperty, null, dome, Array.Empty<object>())!; } catch { }
             if (atHomeSupported)
             {
-                try { atHome = (bool)dome.GetType().InvokeMember("AtHome", System.Reflection.BindingFlags.GetProperty, null, dome, Array.Empty<object>()); } catch { atHomeSupported = false; }
+                try { atHome = (bool)dome.GetType().InvokeMember("AtHome", System.Reflection.BindingFlags.GetProperty, null, dome, Array.Empty<object>())!; } catch { atHomeSupported = false; }
             }
-            try { az = (double)dome.GetType().InvokeMember("Azimuth", System.Reflection.BindingFlags.GetProperty, null, dome, Array.Empty<object>()); } catch { }
+            try { az = (double)dome.GetType().InvokeMember("Azimuth", System.Reflection.BindingFlags.GetProperty, null, dome, Array.Empty<object>())!; } catch { }
 
             if (atHomeSupported && atHome == true)
             {
@@ -389,7 +389,7 @@ public sealed class RestartSequenceService : IDisposable
             {
                 try
                 {
-                    var canWrite = (bool)swObj.GetType().InvokeMember("CanWrite", System.Reflection.BindingFlags.InvokeMethod, null, swObj, new object[] { index });
+                    var canWrite = (bool)swObj.GetType().InvokeMember("CanWrite", System.Reflection.BindingFlags.InvokeMethod, null, swObj, new object[] { index })!;
                     if (!canWrite)
                     {
                         throw new InvalidOperationException($"CanWrite({index})=false");
@@ -433,8 +433,8 @@ public sealed class RestartSequenceService : IDisposable
 
                 bool? state = null;
                 double? value = null;
-                try { state = (bool)swObj.GetType().InvokeMember("GetSwitch", System.Reflection.BindingFlags.InvokeMethod, null, swObj, new object[] { index }); } catch { }
-                try { value = (double)swObj.GetType().InvokeMember("GetSwitchValue", System.Reflection.BindingFlags.InvokeMethod, null, swObj, new object[] { index }); } catch { }
+                try { state = (bool)swObj.GetType().InvokeMember("GetSwitch", System.Reflection.BindingFlags.InvokeMethod, null, swObj, new object[] { index })!; } catch { }
+                try { value = (double)swObj.GetType().InvokeMember("GetSwitchValue", System.Reflection.BindingFlags.InvokeMethod, null, swObj, new object[] { index })!; } catch { }
 
                 Log(logWriter, $"FanOnOff ensured: index={index} GetSwitch={state} GetSwitchValue={value}");
                 return;
@@ -467,7 +467,7 @@ public sealed class RestartSequenceService : IDisposable
                 try
                 {
                     canWrite = (bool)swObj.GetType().InvokeMember("CanWrite", 
-                        System.Reflection.BindingFlags.InvokeMethod, null, swObj, new object[] { cached.Index });
+                        System.Reflection.BindingFlags.InvokeMethod, null, swObj, new object[] { cached.Index })!;
                 }
                 catch
                 {

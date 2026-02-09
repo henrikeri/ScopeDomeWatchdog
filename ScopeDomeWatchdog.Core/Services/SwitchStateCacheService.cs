@@ -83,14 +83,14 @@ public sealed class SwitchStateCacheService
                         try
                         {
                             state = (bool)sw.GetType().InvokeMember("GetSwitch",
-                                System.Reflection.BindingFlags.InvokeMethod, null, sw, new object[] { monitoredSwitch.Index });
+                                System.Reflection.BindingFlags.InvokeMethod, null, sw, new object[] { monitoredSwitch.Index })!;
                         }
                         catch { }
 
                         try
                         {
                             value = (double)sw.GetType().InvokeMember("GetSwitchValue",
-                                System.Reflection.BindingFlags.InvokeMethod, null, sw, new object[] { monitoredSwitch.Index });
+                                System.Reflection.BindingFlags.InvokeMethod, null, sw, new object[] { monitoredSwitch.Index })!;
                         }
                         catch { }
 

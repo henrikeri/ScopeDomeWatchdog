@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <DebugType>none</DebugType>
+    <NoWarn>CA1416</NoWarn>
   </PropertyGroup>
 
 </Project>

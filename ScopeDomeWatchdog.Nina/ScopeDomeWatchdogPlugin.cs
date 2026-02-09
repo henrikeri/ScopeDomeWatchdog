@@ -193,8 +193,8 @@ namespace ScopeDomeWatchdog.Nina {
 
         public event PropertyChangedEventHandler? PropertyChanged;
         
-        protected void RaisePropertyChanged([CallerMemberName] string propertyName = null) {
-            this.PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        protected void RaisePropertyChanged([CallerMemberName] string? propertyName = null) {
+            this.PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName!));
         }
     }
 }
