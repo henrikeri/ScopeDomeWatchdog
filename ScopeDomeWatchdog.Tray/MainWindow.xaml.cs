@@ -182,6 +182,8 @@ public partial class MainWindow : Window
         }
 
         UpdateResetStatistics();
+
+        UpdateResetStatistics();
     }
 
     private void UpdateResetStatistics()
