@@ -91,8 +91,27 @@ dotnet publish ScopeDomeWatchdog.Trigger -c Release -r win-x64 /p:PublishSingleF
 
 ## License
 
-- **ScopeDomeWatchdog.Core, .Tray, .Trigger**: MIT License
-- **ScopeDomeWatchdog.Nina**: Mozilla Public License 2.0 (MPL-2.0)
+This project is licensed under the **GNU General Public License v3.0 (GPL-3.0-or-later)**.
 
-The NINA plugin uses patterns from the ["When" plugin](https://github.com/isbeorn/nina.plugin.when) 
-by Stefan Berg, licensed under MPL-2.0.
+You are free to use, modify, and distribute this software under the terms of the GPL v3. 
+See the [LICENSE](LICENSE) file for the complete license text.
+
+### License Notes
+
+- The majority of the codebase is licensed under GPL v3
+- Certain files in the N.I.N.A. plugin (`Triggers/DomeReconnectionTrigger.cs` and 
+  `Containers/TriggerInstructionContainer.cs`) retain their MPL-2.0 headers as they 
+  contain code derived from the ["When" plugin](https://github.com/isbeorn/nina.plugin.when) 
+  by Stefan Berg
+- MPL-2.0 is compatible with GPL v3 under the terms of both licenses
+
+For detailed information about third-party components and their licenses, see 
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+### Copyright
+
+Copyright (C) 2026
+
+This program comes with ABSOLUTELY NO WARRANTY. This is free software, and you are 
+welcome to redistribute it under certain conditions. See the LICENSE file for details.
+
