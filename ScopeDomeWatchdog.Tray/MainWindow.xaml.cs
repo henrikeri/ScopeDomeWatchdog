@@ -111,6 +111,7 @@ public partial class MainWindow : Window
 
         var refreshed = ConfigService.LoadOrCreate(_configPath);
         var oldEventName = _config.TriggerEventName;
+        var oldLogDirectory = _config.RestartLogDirectory;
         _config.MonitorIp = refreshed.MonitorIp;
         _config.PingIntervalSec = refreshed.PingIntervalSec;
         _config.PingTimeoutMs = refreshed.PingTimeoutMs;
@@ -165,6 +166,10 @@ public partial class MainWindow : Window
         _onConfigUpdated?.Invoke(_config);
 
         UpdateConfigSummary();
+        if (!string.Equals(oldLogDirectory, _config.RestartLogDirectory, StringComparison.OrdinalIgnoreCase))
+        {
+            ResetLiveLogTail();
+        }
     }
 
     private void UpdateConfigSummary()
@@ -272,15 +277,19 @@ public partial class MainWindow : Window
                 return;
             }
 
-            var files = dir.GetFiles("ScopeDomeRestart_*.log")
-                .OrderByDescending(f => f.CreationTime)
+            var files = dir.GetFiles()
+                .Where(f =>
+                    string.Equals(f.Name, "ScopeDomeWatchdog.log", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(f.Name, "ScopeDomeWatchdog.events.jsonl", StringComparison.OrdinalIgnoreCase) ||
+                    (f.Name.StartsWith("ScopeDomeRestart_", StringComparison.OrdinalIgnoreCase) && string.Equals(f.Extension, ".log", StringComparison.OrdinalIgnoreCase)))
+                .OrderByDescending(f => f.LastWriteTime)
                 .Take(10)
                 .ToList();
 
             LogsList.Items.Clear();
             foreach (var file in files)
             {
-                LogsList.Items.Add($"{file.CreationTime:yyyy-MM-dd HH:mm:ss} - {file.Name}");
+                LogsList.Items.Add($"{file.LastWriteTime:yyyy-MM-dd HH:mm:ss} - {file.Name}");
             }
         }
         catch
@@ -370,6 +379,17 @@ public partial class MainWindow : Window
         {
             // If watcher fails, timer will still work
         }
+    }
+
+    private void ResetLiveLogTail()
+    {
+        _logFileWatcher?.Dispose();
+        _logFileWatcher = null;
+        _lastLogPosition = 0;
+        LiveLogTextBox.Text = "";
+        SetupLogFileWatcher();
+        RefreshLogs();
+        UpdateLiveLog();
     }
 
     private void UpdateLiveLog()

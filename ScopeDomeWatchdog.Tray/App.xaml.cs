@@ -18,6 +18,7 @@ using System;
 using System.Windows;
 using WpfApplication = System.Windows.Application;
 using ScopeDomeWatchdog.Core.Interop;
+using ScopeDomeWatchdog.Core.Logging;
 using ScopeDomeWatchdog.Core.Models;
 using ScopeDomeWatchdog.Core.Services;
 using ScopeDomeWatchdog.Tray.Services;
@@ -61,10 +62,13 @@ public partial class App : WpfApplication
 		_restartService = new RestartSequenceService(_config, configDir, _ninaService);
 		_restartService.SetSwitchCacheService(_switchCacheService);
 		
-		_runner = new WatchdogRunner(_config, ct => _restartService.ExecuteAsync(ct), _ninaService);
+		_runner = new WatchdogRunner(_config, ninaService: _ninaService);
+		_runner.SetRestartHandler((reason, ct) => _restartService.ExecuteAsync(ct, reason));
+		_runner.LogMessage += WriteWatchdogLog;
 		_runner.SetSwitchCacheService(_switchCacheService);
 		
 		_encoderCacheService = new ScopeDomeEncoderCacheService(_config, _configPath);
+		_encoderCacheService.LogMessage += WriteWatchdogLog;
 		_encoderCacheService.SetRestartCheckCallback(() => _runner?.IsRestartInProgress ?? false);
 		_encoderCacheService.Start();
         
@@ -98,6 +102,8 @@ public partial class App : WpfApplication
 		{
 			_mainWindow.Show();
 		}
+
+		WriteWatchdogLog("ScopeDome Watchdog tray application started.");
 	}
 
 	private void ExitApplication()
@@ -116,6 +122,23 @@ public partial class App : WpfApplication
 		_switchStaRunner?.Dispose();
 
 		Shutdown();
+	}
+
+	private void WriteWatchdogLog(string message)
+	{
+		try
+		{
+			if (_config == null)
+			{
+				return;
+			}
+
+			new RestartLogWriter(_config.RestartLogDirectory).WriteEvent("Watchdog", message);
+		}
+		catch
+		{
+			// The watchdog must keep running even if the log file is temporarily unavailable.
+		}
 	}
 }
 

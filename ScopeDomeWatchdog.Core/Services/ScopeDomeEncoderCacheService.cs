@@ -32,6 +32,7 @@ public sealed class ScopeDomeEncoderCacheService : IDisposable
 
     /// <summary>Fires when encoder value is updated</summary>
     public event Action? EncoderUpdated;
+    public event Action<string>? LogMessage;
 
     public ScopeDomeEncoderCacheService(WatchdogConfig config, string configPath)
     {
@@ -86,6 +87,7 @@ public sealed class ScopeDomeEncoderCacheService : IDisposable
             // Skip caching during restart
             if (_isRestartInProgress?.Invoke() == true)
             {
+                Log("Encoder cache refresh skipped: restart sequence in progress.");
                 continue;
             }
 
@@ -97,6 +99,7 @@ public sealed class ScopeDomeEncoderCacheService : IDisposable
     {
         if (string.IsNullOrWhiteSpace(_config.DomeHttpIp))
         {
+            Log("Encoder cache refresh skipped: Dome HTTP IP is not set.");
             return;
         }
 
@@ -106,6 +109,7 @@ public sealed class ScopeDomeEncoderCacheService : IDisposable
             var value = await client.GetEncoderValueAsync(_config.DomeHttpIp, cancellationToken);
             if (!value.HasValue)
             {
+                Log($"Encoder cache refresh did not return a value from {_config.DomeHttpIp}.");
                 return;
             }
 
@@ -120,11 +124,24 @@ public sealed class ScopeDomeEncoderCacheService : IDisposable
             }
 
             // Notify UI that encoder was updated
+            Log($"Encoder cached: value={value.Value}, source={_config.DomeHttpIp}.");
             EncoderUpdated?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            Log("Encoder cache refresh failed: " + ex.Message);
+        }
+    }
+
+    private void Log(string message)
+    {
+        try
+        {
+            LogMessage?.Invoke(message);
         }
         catch
         {
-            // swallow background polling errors
+            // Logging must not stop background encoder polling.
         }
     }
 

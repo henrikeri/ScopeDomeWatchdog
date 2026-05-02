@@ -17,6 +17,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -51,21 +52,26 @@ public sealed class RestartSequenceService : IDisposable
 
     public RestartHistoryService GetHistoryService => _historyService;
 
-    public async Task<bool> ExecuteAsync(CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(CancellationToken cancellationToken, string? triggerReason = null)
     {
         using var mutex = new Mutex(false, _config.MutexName);
         var acquired = false;
         var shellyClient = new ShellyClient(TimeSpan.FromSeconds(_config.HttpTimeoutSec));
         var logWriter = new RestartLogWriter(_config.RestartLogDirectory);
+        var reason = string.IsNullOrWhiteSpace(triggerReason) ? "Watchdog triggered" : triggerReason;
         try
         {
+            _historyService.LogRestartStart(reason);
+
             acquired = mutex.WaitOne(0);
             if (!acquired)
             {
+                const string message = "Restart skipped: another restart sequence is already running.";
+                Log(logWriter, message);
+                _historyService.LogRestartEnd(false, message);
                 return false;
             }
 
-            _historyService.LogRestartStart("Watchdog triggered");
             Log(logWriter, "=== RESTART SEQUENCE BEGIN ===");
 
             // Signal Nina that dome reconnection is starting
@@ -234,6 +240,7 @@ public sealed class RestartSequenceService : IDisposable
                     var cachedStates = _switchCacheService?.GetCachedStates();
                     if (cachedStates != null && cachedStates.Count > 0)
                     {
+                        Log(logWriter, $"Using {cachedStates.Count} in-memory cached switch state(s)");
                         Log(logWriter, $"Restoring {cachedStates.Count} cached switch states...");
                         RestoreCachedSwitchStates(sw, cachedStates, logWriter);
                     }
@@ -504,8 +511,29 @@ public sealed class RestartSequenceService : IDisposable
                         swObj.GetType().InvokeMember("SetSwitch", 
                             System.Reflection.BindingFlags.InvokeMethod, null, swObj, 
                             new object[] { cached.Index, cached.State.Value });
-                        setOk = true;
-                        Log(logWriter, $"Restored switch {cached.Index} ({cached.Name}) State={cached.State.Value}");
+
+                        bool? readBack = null;
+                        try
+                        {
+                            readBack = (bool)swObj.GetType().InvokeMember("GetSwitch",
+                                System.Reflection.BindingFlags.InvokeMethod, null, swObj,
+                                new object[] { cached.Index })!;
+                        }
+                        catch
+                        {
+                            // Some drivers support writing but not reliable readback.
+                        }
+
+                        if (!readBack.HasValue || readBack.Value == cached.State.Value)
+                        {
+                            setOk = true;
+                            var suffix = readBack.HasValue ? " confirmed" : " (readback unavailable)";
+                            Log(logWriter, $"Restored switch {cached.Index} ({cached.Name}) State={cached.State.Value}{suffix}");
+                        }
+                        else
+                        {
+                            Log(logWriter, $"Switch {cached.Index} ({cached.Name}) read back State={readBack.Value} after requesting State={cached.State.Value}");
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -521,12 +549,34 @@ public sealed class RestartSequenceService : IDisposable
                         swObj.GetType().InvokeMember("SetSwitchValue", 
                             System.Reflection.BindingFlags.InvokeMethod, null, swObj, 
                             new object[] { cached.Index, cached.Value.Value });
-                        setOk = true;
-                        Log(logWriter, $"Restored switch {cached.Index} ({cached.Name}) Value={cached.Value.Value}");
+
+                        double? readBack = null;
+                        try
+                        {
+                            readBack = (double)swObj.GetType().InvokeMember("GetSwitchValue",
+                                System.Reflection.BindingFlags.InvokeMethod, null, swObj,
+                                new object[] { cached.Index })!;
+                        }
+                        catch
+                        {
+                            // Some drivers support writing but not reliable readback.
+                        }
+
+                        var requestedValue = FormatSwitchValue(cached.Value.Value);
+                        if (!readBack.HasValue || Math.Abs(readBack.Value - cached.Value.Value) < 0.0001)
+                        {
+                            setOk = true;
+                            var suffix = readBack.HasValue ? " confirmed" : " (readback unavailable)";
+                            Log(logWriter, $"Restored switch {cached.Index} ({cached.Name}) Value={requestedValue}{suffix}");
+                        }
+                        else
+                        {
+                            Log(logWriter, $"Switch {cached.Index} ({cached.Name}) read back Value={FormatSwitchValue(readBack.Value)} after requesting Value={requestedValue}");
+                        }
                     }
                     catch (Exception ex)
                     {
-                        Log(logWriter, $"SetSwitchValue({cached.Index}, {cached.Value.Value}) failed: {ex.Message}");
+                        Log(logWriter, $"SetSwitchValue({cached.Index}, {FormatSwitchValue(cached.Value.Value)}) failed: {ex.Message}");
                     }
                 }
 
@@ -550,7 +600,19 @@ public sealed class RestartSequenceService : IDisposable
 
     private void Log(RestartLogWriter writer, string message)
     {
-        writer.WriteLine(message);
+        try
+        {
+            writer.WriteEvent("RestartSequence", message);
+        }
+        catch
+        {
+            // A logging problem must not interrupt dome recovery.
+        }
+    }
+
+    private static string FormatSwitchValue(double value)
+    {
+        return value.ToString("G", CultureInfo.InvariantCulture);
     }
 
     private static Task DelaySeconds(int seconds, CancellationToken cancellationToken)

@@ -37,11 +37,15 @@ public sealed class WatchdogRunner : IDisposable
     private Task? _switchCacheTask;
     private DateTime _lastCycleUtc = DateTime.MinValue;
     private DateTime _lastSwitchCacheUtc = DateTime.MinValue;
-    private Func<CancellationToken, Task<bool>>? _restartHandler;
+    private Func<string, CancellationToken, Task<bool>>? _restartHandler;
     private bool _isRunning = false;
     private INinaPluginService? _ninaService;
     private SwitchStateCacheService? _switchCacheService;
     private volatile bool _restartInProgress = false;
+    private bool _wasFailing = false;
+    private DateTime _lastFailureLogUtc = DateTime.MinValue;
+    private DateTime _lastSuppressedRestartLogUtc = DateTime.MinValue;
+    private bool _manualTriggerLogged = false;
 
     public event Action<WatchdogStatus>? StatusUpdated;
     public event Action<bool>? RunningStateChanged;
@@ -56,7 +60,7 @@ public sealed class WatchdogRunner : IDisposable
     public WatchdogRunner(WatchdogConfig config, Func<CancellationToken, Task<bool>>? restartHandler = null, INinaPluginService? ninaService = null)
     {
         _config = config;
-        _restartHandler = restartHandler;
+        _restartHandler = restartHandler == null ? null : (_, ct) => restartHandler(ct);
         _ninaService = ninaService;
         _triggerEvent = new EventWaitHandle(false, EventResetMode.ManualReset, _config.TriggerEventName);
     }
@@ -64,7 +68,7 @@ public sealed class WatchdogRunner : IDisposable
     public void SetSwitchCacheService(SwitchStateCacheService service)
     {
         _switchCacheService = service;
-        _switchCacheService.LogMessage += msg => LogMessage?.Invoke(msg);
+        _switchCacheService.LogMessage += Log;
         _switchCacheService.StatesCached += states => SwitchStatesCached?.Invoke(states);
     }
 
@@ -78,6 +82,7 @@ public sealed class WatchdogRunner : IDisposable
         _isRunning = true;
         _loopTask = Task.Run(LoopAsync);
         _switchCacheTask = Task.Run(SwitchCacheLoopAsync);
+        Log($"Watchdog monitoring started: monitor={_config.MonitorIp}, interval={_config.PingIntervalSec}s, timeout={_config.PingTimeoutMs}ms, triggerAfter={_config.FailsToTrigger} failed ping(s)");
         RunningStateChanged?.Invoke(true);
     }
 
@@ -90,6 +95,7 @@ public sealed class WatchdogRunner : IDisposable
         _switchCacheTask?.Wait(TimeSpan.FromSeconds(5));
         _loopTask = null;
         _switchCacheTask = null;
+        Log("Watchdog monitoring stopped.");
         RunningStateChanged?.Invoke(false);
     }
 
@@ -115,6 +121,11 @@ public sealed class WatchdogRunner : IDisposable
 
     public void SetRestartHandler(Func<CancellationToken, Task<bool>>? handler)
     {
+        _restartHandler = handler == null ? null : (_, ct) => handler(ct);
+    }
+
+    public void SetRestartHandler(Func<string, CancellationToken, Task<bool>>? handler)
+    {
         _restartHandler = handler;
     }
 
@@ -133,19 +144,32 @@ public sealed class WatchdogRunner : IDisposable
 
             bool ok = false;
             int? ms = null;
+            string? failureReason = null;
             try
             {
                 var reply = await ping.SendPingAsync(_config.MonitorIp, _config.PingTimeoutMs);
                 ok = reply.Status == IPStatus.Success;
                 ms = ok ? (int)reply.RoundtripTime : null;
+                if (!ok)
+                {
+                    failureReason = $"ping status {reply.Status}";
+                }
             }
-            catch
+            catch (Exception ex)
             {
                 ok = false;
+                failureReason = ex.Message;
             }
 
             if (ok)
             {
+                if (_wasFailing)
+                {
+                    Log($"Monitor recovered: ping to {_config.MonitorIp} OK after {_status.ConsecutiveFails} failed ping(s). Last latency={ms}ms");
+                }
+
+                _wasFailing = false;
+                _lastFailureLogUtc = DateTime.MinValue;
                 _status.OkPings++;
                 _status.ConsecutiveFails = 0;
                 if (ms.HasValue)
@@ -160,6 +184,7 @@ public sealed class WatchdogRunner : IDisposable
             else
             {
                 _status.ConsecutiveFails++;
+                LogFailureIfNeeded(failureReason);
             }
 
             // Record metrics for graphing
@@ -167,7 +192,17 @@ public sealed class WatchdogRunner : IDisposable
 
             if (manualRequested && _status.ConsecutiveFails < _config.FailsToTrigger)
             {
+                if (!_manualTriggerLogged)
+                {
+                    Log($"Manual restart requested via trigger event '{_config.TriggerEventName}'.");
+                    _manualTriggerLogged = true;
+                }
+
                 _status.ConsecutiveFails = _config.FailsToTrigger;
+            }
+            else if (!manualRequested)
+            {
+                _manualTriggerLogged = false;
             }
 
             _status.LastPingOk = ok;
@@ -179,8 +214,30 @@ public sealed class WatchdogRunner : IDisposable
             var inCooldown = (now - _lastCycleUtc).TotalSeconds < _config.CooldownSeconds;
             _status.CooldownRemaining = inCooldown ? TimeSpan.FromSeconds(Math.Max(0, _config.CooldownSeconds - (now - _lastCycleUtc).TotalSeconds)) : null;
 
-            if (_status.ConsecutiveFails >= _config.FailsToTrigger && !inCooldown && _restartHandler != null)
+            if (_status.ConsecutiveFails >= _config.FailsToTrigger)
             {
+                var triggerReason = manualRequested
+                    ? $"manual trigger event '{_config.TriggerEventName}'"
+                    : $"{_status.ConsecutiveFails} consecutive failed ping(s) to {_config.MonitorIp}";
+
+                if (inCooldown)
+                {
+                    LogSuppressedRestartIfNeeded($"Restart suppressed during cooldown: {triggerReason}. Remaining cooldown={_status.CooldownRemaining?.TotalSeconds:0}s");
+                    StatusUpdated?.Invoke(_status.Clone());
+                    await DelayUntilNextPingAsync();
+                    continue;
+                }
+
+                if (_restartHandler == null)
+                {
+                    LogSuppressedRestartIfNeeded($"Restart suppressed: no restart handler is configured. Trigger reason={triggerReason}");
+                    StatusUpdated?.Invoke(_status.Clone());
+                    await DelayUntilNextPingAsync();
+                    continue;
+                }
+
+                Log($"Restart sequence requested: {triggerReason}.");
+
                 if (manualRequested)
                 {
                     lock (_triggerLock)
@@ -193,27 +250,32 @@ public sealed class WatchdogRunner : IDisposable
                 try
                 {
                     _restartInProgress = true;
-                    LogMessage?.Invoke("Restart sequence starting - pausing cache operations");
-                    success = await _restartHandler(_cts.Token);
+                    Log("Restart sequence starting - pausing cache operations");
+                    success = await _restartHandler(triggerReason, _cts.Token);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    Log("Restart handler failed: " + ex.Message);
                     success = false;
                 }
                 finally
                 {
                     _restartInProgress = false;
-                    LogMessage?.Invoke("Restart sequence complete - resuming cache operations");
+                    Log("Restart sequence complete - resuming cache operations");
                 }
 
                 _lastCycleUtc = DateTime.Now;
                 if (success)
                 {
+                    Log("Restart sequence finished successfully.");
                     _status.LastRestartUtc = _lastCycleUtc;
                     _status.ConsecutiveFails = 0;
+                    _wasFailing = false;
+                    _lastFailureLogUtc = DateTime.MinValue;
                 }
                 else
                 {
+                    Log("Restart sequence finished with errors.");
                     if (manualRequested)
                     {
                         lock (_triggerLock)
@@ -227,14 +289,7 @@ public sealed class WatchdogRunner : IDisposable
 
             StatusUpdated?.Invoke(_status.Clone());
 
-            try
-            {
-                await Task.Delay(TimeSpan.FromSeconds(_config.PingIntervalSec), _cts.Token);
-            }
-            catch (TaskCanceledException)
-            {
-                break;
-            }
+            await DelayUntilNextPingAsync();
         }
     }
 
@@ -262,7 +317,7 @@ public sealed class WatchdogRunner : IDisposable
                     !string.IsNullOrWhiteSpace(_config.AscomSwitchProgId) &&
                     elapsed >= _config.SwitchCacheIntervalSec)
                 {
-                    LogMessage?.Invoke($"Caching switch states (interval: {_config.SwitchCacheIntervalSec}s)...");
+                    Log($"Caching switch states (interval: {_config.SwitchCacheIntervalSec}s)...");
                     
                     await _switchCacheService.ReadAndCacheStatesAsync(
                         _config.AscomSwitchProgId,
@@ -280,8 +335,71 @@ public sealed class WatchdogRunner : IDisposable
             }
             catch (Exception ex)
             {
-                LogMessage?.Invoke($"Error in switch cache loop: {ex.Message}");
+                Log($"Error in switch cache loop: {ex.Message}");
                 await Task.Delay(TimeSpan.FromSeconds(10), _cts.Token);
+            }
+        }
+    }
+
+    private void LogFailureIfNeeded(string? failureReason)
+    {
+        var nowUtc = DateTime.UtcNow;
+        var isFirstFailure = !_wasFailing;
+        var reachedThreshold = _status.ConsecutiveFails == _config.FailsToTrigger;
+        var shouldRepeat = _wasFailing && (nowUtc - _lastFailureLogUtc).TotalSeconds >= 60;
+
+        if (!isFirstFailure && !reachedThreshold && !shouldRepeat)
+        {
+            return;
+        }
+
+        _wasFailing = true;
+        _lastFailureLogUtc = nowUtc;
+
+        var reason = string.IsNullOrWhiteSpace(failureReason) ? "no reply" : failureReason;
+        Log($"Monitor failure: ping to {_config.MonitorIp} failed ({reason}). Consecutive failures={_status.ConsecutiveFails}/{_config.FailsToTrigger}");
+    }
+
+    private void LogSuppressedRestartIfNeeded(string message)
+    {
+        var nowUtc = DateTime.UtcNow;
+        if ((nowUtc - _lastSuppressedRestartLogUtc).TotalSeconds < 60)
+        {
+            return;
+        }
+
+        _lastSuppressedRestartLogUtc = nowUtc;
+        Log(message);
+    }
+
+    private async Task DelayUntilNextPingAsync()
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(_config.PingIntervalSec), _cts.Token);
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    private void Log(string message)
+    {
+        var handlers = LogMessage;
+        if (handlers == null)
+        {
+            return;
+        }
+
+        foreach (Action<string> handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(message);
+            }
+            catch
+            {
+                // Logging must never stop the watchdog loop.
             }
         }
     }
