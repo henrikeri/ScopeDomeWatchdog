@@ -27,6 +27,33 @@
                             <Button Width="180" Margin="0,0,12,0" Content="Select Switches to Monitor" Click="SelectSubSwitchButton_Click" />
                             <TextBlock Name="SubSwitchText" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="400" />
                         </StackPanel>
+                        <Separator Margin="0,12,0,12" />
+                        <CheckBox Name="AscomRemoteRestartEnabledCheckBox"
+                                  Content="Reload ASCOM Remote drivers after ScopeDome recovery"
+                                  Margin="0,0,0,12" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="ASCOM Remote URL:" VerticalAlignment="Center" Margin="0,0,12,8" />
+                            <TextBox Grid.Row="0" Grid.Column="1" Name="AscomRemoteBaseUrlBox" Margin="0,0,0,8" Padding="6" />
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Alpaca Dome Device No.:" VerticalAlignment="Center" Margin="0,0,12,8" />
+                            <TextBox Grid.Row="1" Grid.Column="1" Name="AscomRemoteDomeDeviceNumberBox" Margin="0,0,0,8" Padding="6" />
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Remote Reload Timeout (sec):" VerticalAlignment="Center" Margin="0,0,12,0" />
+                            <TextBox Grid.Row="2" Grid.Column="1" Name="AscomRemoteRestartTimeoutBox" Padding="6" />
+                        </Grid>
+                        <TextBlock Margin="0,8,0,0" FontSize="11" TextWrapping="Wrap"
+                                   Foreground="{StaticResource TextMutedColor}"
+                                   Text="Requires ASCOM Remote's Management Interface and Remote Management Interface Reboot Command. Reloading affects every driver hosted by ASCOM Remote." />
                     </StackPanel>
                 </Border>
 
@@ -69,6 +96,22 @@
                             <Button Width="160" Margin="0,0,12,0" Content="Detect Relays" Click="DetectShellyRelaysButton_Click" />
                             <TextBlock Name="ShellyRelayText" VerticalAlignment="Center" FontSize="12" MinWidth="200" />
                         </StackPanel>
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Name="ScanBleDevicesButton" Width="188" HorizontalAlignment="Left"
+                                    Content="Scan for BLE Devices" Click="ScanBleDevicesButton_Click"
+                                    ToolTip="Scan for nearby Bluetooth Low Energy devices for 8 seconds" />
+                            <ComboBox Grid.Column="1" Name="ShellyBleDevicesBox" Padding="6" Margin="0,0,0,0" IsEnabled="False"
+                                      DisplayMemberPath="DisplayLabel" SelectionChanged="ShellyBleDevicesBox_SelectionChanged"
+                                      MaxDropDownHeight="360" HorizontalContentAlignment="Stretch"
+                                      ToolTip="Select a discovered device to fill in its BLE address" />
+                        </Grid>
+                        <TextBlock Name="ShellyBleScanStatusText" Margin="200,0,0,12" FontSize="11"
+                                   Foreground="{StaticResource TextMutedColor}" TextWrapping="Wrap"
+                                   Text="Click Scan to find nearby BLE devices; no MAC address lookup is required." />
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="200" />
@@ -78,17 +121,47 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Plug IP:" VerticalAlignment="Center" Margin="0,0,12,8" />
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Plug IP 1:" VerticalAlignment="Center" Margin="0,0,12,8" />
                             <TextBox Grid.Row="0" Grid.Column="1" Name="PlugIpBox" Margin="0,0,0,8" Padding="6" />
 
-                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Switch ID:" VerticalAlignment="Center" Margin="0,0,12,8" />
-                            <TextBox Grid.Row="1" Grid.Column="1" Name="SwitchIdBox" Margin="0,0,0,8" Padding="6" />
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Plug IP 2:" VerticalAlignment="Center" Margin="0,0,12,8" />
+                            <TextBox Grid.Row="1" Grid.Column="1" Name="FallbackPlugIpBox" Margin="0,0,0,8" Padding="6" ToolTip="Optional second Wi-Fi address, tried after Plug IP 1" />
 
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Off Duration (sec):" VerticalAlignment="Center" Margin="0,0,12,0" />
-                            <TextBox Grid.Row="2" Grid.Column="1" Name="OffSecondsBox" Margin="0,0,0,0" Padding="6" />
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Switch ID:" VerticalAlignment="Center" Margin="0,0,12,8" />
+                            <TextBox Grid.Row="2" Grid.Column="1" Name="SwitchIdBox" Margin="0,0,0,8" Padding="6" />
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Off Duration (sec):" VerticalAlignment="Center" Margin="0,0,12,8" />
+                            <TextBox Grid.Row="3" Grid.Column="1" Name="OffSecondsBox" Margin="0,0,0,8" Padding="6" />
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="BLE Fallback:" VerticalAlignment="Center" Margin="0,0,12,8" />
+                            <CheckBox Grid.Row="4" Grid.Column="1" Name="ShellyBleEnabledBox" Content="Enable bonded BLE fallback after both IPs fail" VerticalAlignment="Center" Margin="0,0,0,8" />
+
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="BLE Address:" VerticalAlignment="Center" Margin="0,0,12,8" />
+                            <TextBox Grid.Row="5" Grid.Column="1" Name="ShellyBleAddressBox" Margin="0,0,0,8" Padding="6" ToolTip="Public BLE address, e.g. 8C:BF:EA:99:9C:DE" />
+
+                            <TextBlock Grid.Row="6" Grid.Column="0" Text="Expected Name Prefix:" VerticalAlignment="Center" Margin="0,0,12,8" />
+                            <TextBox Grid.Row="6" Grid.Column="1" Name="ShellyBleNamePrefixBox" Margin="0,0,0,8" Padding="6" />
+
+                            <TextBlock Grid.Row="7" Grid.Column="0" Text="BLE Discovery Timeout (sec):" VerticalAlignment="Center" Margin="0,0,12,8" />
+                            <TextBox Grid.Row="7" Grid.Column="1" Name="ShellyBleDiscoveryTimeoutBox" Margin="0,0,0,8" Padding="6" />
+
+                            <TextBlock Grid.Row="8" Grid.Column="0" Text="BLE Connect Timeout (sec):" VerticalAlignment="Center" Margin="0,0,12,8" />
+                            <TextBox Grid.Row="8" Grid.Column="1" Name="ShellyBleConnectTimeoutBox" Margin="0,0,0,8" Padding="6" />
+
+                            <TextBlock Grid.Row="9" Grid.Column="0" Text="BLE RPC Timeout (sec):" VerticalAlignment="Center" Margin="0,0,12,0" />
+                            <TextBox Grid.Row="9" Grid.Column="1" Name="ShellyBleResponseTimeoutBox" Padding="6" />
                         </Grid>
+                        <TextBlock Margin="0,12,0,0" FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource TextMutedColor}"
+                                   Text="BLE requires RPC over Bluetooth to be enabled and the Shelly to be paired once in Windows Settings under the same account that runs this app. Runtime pairing is intentionally not attempted." />
                     </StackPanel>
                 </Border>
 

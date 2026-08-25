@@ -23,7 +23,12 @@ using System.Threading.Tasks;
 
 namespace ScopeDomeWatchdog.Core.Services;
 
-public sealed class ShellyClient
+public sealed record ShellyDeviceIdentity(
+    string MacAddress,
+    string? AssignedName,
+    string? DeviceId);
+
+public sealed class ShellyClient : IDisposable
 {
     private readonly HttpClient _httpClient;
 
@@ -137,10 +142,57 @@ public sealed class ShellyClient
         throw new InvalidOperationException("Switch.GetStatus response missing 'output'.");
     }
 
+    public async Task<ShellyDeviceIdentity> GetDeviceIdentityAsync(
+        string ip,
+        CancellationToken cancellationToken)
+    {
+        var url = $"http://{ip}/rpc/Sys.GetConfig";
+        var json = await _httpClient.GetStringAsync(url, cancellationToken).ConfigureAwait(false);
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("device", out var device) ||
+            !device.TryGetProperty("mac", out var macElement) ||
+            string.IsNullOrWhiteSpace(macElement.GetString()))
+        {
+            throw new InvalidOperationException("Sys.GetConfig response missing 'device.mac'.");
+        }
+
+        string? assignedName = null;
+        if (device.TryGetProperty("name", out var nameElement) &&
+            nameElement.ValueKind == JsonValueKind.String)
+        {
+            assignedName = nameElement.GetString();
+        }
+
+        string? deviceId = null;
+        try
+        {
+            var infoJson = await _httpClient
+                .GetStringAsync($"http://{ip}/rpc/Shelly.GetDeviceInfo", cancellationToken)
+                .ConfigureAwait(false);
+            using var infoDocument = JsonDocument.Parse(infoJson);
+            if (infoDocument.RootElement.TryGetProperty("id", out var idElement) &&
+                idElement.ValueKind == JsonValueKind.String)
+            {
+                deviceId = idElement.GetString();
+            }
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Sys.GetConfig already supplied the useful MAC and assigned name.
+        }
+
+        return new ShellyDeviceIdentity(macElement.GetString()!, assignedName, deviceId);
+    }
+
     public async Task SetSwitchAsync(string ip, int switchId, bool on, CancellationToken cancellationToken)
     {
         var onText = on ? "true" : "false";
         var url = $"http://{ip}/rpc/Switch.Set?id={switchId}&on={onText}";
         _ = await _httpClient.GetStringAsync(url, cancellationToken);
+    }
+
+    public void Dispose()
+    {
+        _httpClient.Dispose();
     }
 }

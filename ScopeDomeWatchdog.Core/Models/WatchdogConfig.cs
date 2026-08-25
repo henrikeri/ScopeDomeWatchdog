@@ -37,8 +37,32 @@ public sealed class WatchdogConfig
     public int LatencyWindow { get; set; } = 60;
 
     public string PlugIp { get; set; } = "192.168.61.45";
+    public string FallbackPlugIp { get; set; } = string.Empty;
     public int SwitchId { get; set; } = 0;
     public int OffSeconds { get; set; } = 15;
+    public bool ShellyBleEnabled { get; set; }
+    public string ShellyBleAddress { get; set; } = string.Empty;
+    public string ShellyBleExpectedNamePrefix { get; set; } = "ShellyPlugSG3-";
+    public int ShellyBleDiscoveryTimeoutSec { get; set; } = 25;
+    public int ShellyBleConnectTimeoutSec { get; set; } = 30;
+    public int ShellyBleResponseTimeoutSec { get; set; } = 12;
+
+    public IReadOnlyList<string> GetPlugIpAddresses()
+    {
+        var addresses = new List<string>();
+        foreach (var address in new[] { PlugIp, FallbackPlugIp })
+        {
+            var trimmed = address?.Trim();
+            if (!string.IsNullOrWhiteSpace(trimmed) &&
+                !addresses.Exists(existing =>
+                    string.Equals(existing, trimmed, StringComparison.OrdinalIgnoreCase)))
+            {
+                addresses.Add(trimmed);
+            }
+        }
+
+        return addresses;
+    }
 
     public int CooldownSeconds { get; set; } = 120;
     public int PostCycleGraceSec { get; set; } = 30;
@@ -55,6 +79,11 @@ public sealed class WatchdogConfig
     public int AscomDomeConnectRetrySec { get; set; } = 5;
     public int FindHomeTimeoutSec { get; set; } = 900;
     public int FindHomePollMs { get; set; } = 500;
+
+    public bool AscomRemoteRestartEnabled { get; set; }
+    public string AscomRemoteBaseUrl { get; set; } = "http://127.0.0.1:11111";
+    public int AscomRemoteDomeDeviceNumber { get; set; } = 0;
+    public int AscomRemoteRestartTimeoutSec { get; set; } = 120;
 
     public string AscomSwitchProgId { get; set; } = "ASCOM.ScopeDomeUSBDome.DomeLS.Switch";
     
