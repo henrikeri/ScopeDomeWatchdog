@@ -118,8 +118,15 @@ public partial class MainWindow : Window
         _config.FailsToTrigger = refreshed.FailsToTrigger;
         _config.LatencyWindow = refreshed.LatencyWindow;
         _config.PlugIp = refreshed.PlugIp;
+        _config.FallbackPlugIp = refreshed.FallbackPlugIp;
         _config.SwitchId = refreshed.SwitchId;
         _config.OffSeconds = refreshed.OffSeconds;
+        _config.ShellyBleEnabled = refreshed.ShellyBleEnabled;
+        _config.ShellyBleAddress = refreshed.ShellyBleAddress;
+        _config.ShellyBleExpectedNamePrefix = refreshed.ShellyBleExpectedNamePrefix;
+        _config.ShellyBleDiscoveryTimeoutSec = refreshed.ShellyBleDiscoveryTimeoutSec;
+        _config.ShellyBleConnectTimeoutSec = refreshed.ShellyBleConnectTimeoutSec;
+        _config.ShellyBleResponseTimeoutSec = refreshed.ShellyBleResponseTimeoutSec;
         _config.CooldownSeconds = refreshed.CooldownSeconds;
         _config.PostCycleGraceSec = refreshed.PostCycleGraceSec;
         _config.PrePowerWaitSec = refreshed.PrePowerWaitSec;
@@ -132,6 +139,10 @@ public partial class MainWindow : Window
         _config.AscomDomeConnectRetrySec = refreshed.AscomDomeConnectRetrySec;
         _config.FindHomeTimeoutSec = refreshed.FindHomeTimeoutSec;
         _config.FindHomePollMs = refreshed.FindHomePollMs;
+        _config.AscomRemoteRestartEnabled = refreshed.AscomRemoteRestartEnabled;
+        _config.AscomRemoteBaseUrl = refreshed.AscomRemoteBaseUrl;
+        _config.AscomRemoteDomeDeviceNumber = refreshed.AscomRemoteDomeDeviceNumber;
+        _config.AscomRemoteRestartTimeoutSec = refreshed.AscomRemoteRestartTimeoutSec;
         _config.AscomSwitchProgId = refreshed.AscomSwitchProgId;
         _config.MonitoredSwitches.Clear();
         _config.MonitoredSwitches.AddRange(refreshed.MonitoredSwitches);
@@ -177,7 +188,10 @@ public partial class MainWindow : Window
         var switchesLabel = _config.MonitoredSwitches.Count > 0 
             ? $"{_config.MonitoredSwitches.Count} switches" 
             : "none";
-        ConfigText.Text = $"Monitor IP: {_config.MonitorIp} | Shelly IP: {_config.PlugIp} | Dome ProgID: {_config.AscomDomeProgId} | Switch ProgID: {_config.AscomSwitchProgId} | Monitored: {switchesLabel} | Home Action: {_config.HomeActionMode}";
+        var bleLabel = _config.ShellyBleEnabled ? _config.ShellyBleAddress : "disabled";
+        var shellyIps = string.Join(" -> ", _config.GetPlugIpAddresses());
+        var remoteLabel = _config.AscomRemoteRestartEnabled ? "enabled" : "disabled";
+        ConfigText.Text = $"Monitor IP: {_config.MonitorIp} | Shelly: {shellyIps} -> BLE {bleLabel} | ASCOM Remote reload: {remoteLabel} | Dome ProgID: {_config.AscomDomeProgId} | Switch ProgID: {_config.AscomSwitchProgId} | Monitored: {switchesLabel} | Home Action: {_config.HomeActionMode}";
     }
 
     private void UpdateStatus(WatchdogStatus status)

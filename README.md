@@ -15,7 +15,9 @@ seamless imaging session continuity.
 
 - Ping-based dome connectivity monitoring
 - Automatic power-cycle recovery via Shelly smart plugs
+- Configurable Shelly failover order: Plug IP 1, Plug IP 2, then bonded BLE
 - ASCOM dome driver integration (connect, FindHome, encoder caching)
+- Optional ASCOM Remote driver reload and Alpaca dome connection verification after recovery
 - ASCOM switch control for fan management during recovery
 - N.I.N.A. integration: pauses sequence mid-exposure during reconnection, resumes automatically
 - Real-time log viewer with dark theme UI
@@ -27,10 +29,22 @@ Config stored at: `%APPDATA%\ScopeDomeWatchdog\config.json`
 
 Key settings:
 - Monitor IP, ping interval/timeout, fail threshold
-- Shelly IP, switch ID, off/on delays, cooldown
+- Two ordered Shelly IP addresses, switch ID, off/on delays, cooldown
+- Optional bonded BLE fallback address, expected name prefix, and timeouts
 - ASCOM dome/switch ProgID, fan switch index
+- ASCOM Remote URL, Alpaca dome device number, and reload timeout
 - Dome HTTP IP, Basic Auth credentials, encoder poll interval
 - Home action mode (AutoHome or WriteCachedEncoder)
+
+ASCOM Remote reconnection is disabled by default. Enable its Management Interface and Remote
+Management Interface Reboot Command, then enable the reload option in the watchdog settings.
+Saving the watchdog settings updates the running recovery service immediately. ASCOM Remote's
+restart operation reloads every hosted driver, after which the watchdog verifies that the configured
+Alpaca dome device reports connected.
+
+Shelly recovery always tries Plug IP 1, then Plug IP 2, then BLE when BLE fallback is enabled.
+The addresses and BLE identity are configured in the watchdog settings; no fallback address or
+device identity is compiled into the application.
 
 ## N.I.N.A. Plugin
 
@@ -43,9 +57,10 @@ recovery completes.
 1. The watchdog tray app detects dome connectivity loss
 2. Signals the NINA plugin via Windows named events (`Global\ScopeDome_ReconnectionStarted`)
 3. Plugin cancels the running sequence using `CancelAdvancedSequence()`
-4. Watchdog performs power-cycle recovery and ASCOM reconnection
-5. Signals completion via `Global\ScopeDome_ReconnectionComplete`
-6. Plugin resumes sequence from same position using `StartAdvancedSequence(true)`
+4. Watchdog performs power-cycle recovery and reconnects the local ASCOM ScopeDome driver
+5. If enabled, watchdog reloads ASCOM Remote's hosted drivers and verifies its Alpaca dome is connected
+6. Signals completion via `Global\ScopeDome_ReconnectionComplete`
+7. Plugin resumes sequence from same position using `StartAdvancedSequence(true)`
 
 ### Installation
 
@@ -85,8 +100,8 @@ dotnet build -c Release
 ## Publish (self-contained)
 
 ```bash
-dotnet publish ScopeDomeWatchdog.Tray -c Release -r win-x64 /p:PublishSingleFile=true /p:SelfContained=true
-dotnet publish ScopeDomeWatchdog.Trigger -c Release -r win-x64 /p:PublishSingleFile=true /p:SelfContained=true
+dotnet publish ScopeDomeWatchdog.Tray -c Release -r win-x64 /p:PublishSingleFile=true /p:SelfContained=false
+dotnet publish ScopeDomeWatchdog.Trigger -c Release -r win-x64 /p:PublishSingleFile=true /p:SelfContained=false
 ```
 
 ## License
@@ -114,4 +129,3 @@ Copyright (C) 2026
 
 This program comes with ABSOLUTELY NO WARRANTY. This is free software, and you are 
 welcome to redistribute it under certain conditions. See the LICENSE file for details.
-

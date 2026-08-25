@@ -59,7 +59,11 @@ public partial class App : WpfApplication
 		_switchStaRunner = new StaTaskRunner("StaSwitchCache");
 		_switchCacheService = new SwitchStateCacheService(_switchStaRunner);
 		
-		_restartService = new RestartSequenceService(_config, configDir, _ninaService);
+		_restartService = new RestartSequenceService(
+			_config,
+			configDir,
+			_ninaService,
+			new WindowsShellyBleConnector());
 		_restartService.SetSwitchCacheService(_switchCacheService);
 		
 		_runner = new WatchdogRunner(_config, ninaService: _ninaService);

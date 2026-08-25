@@ -34,15 +34,21 @@ public sealed class RestartSequenceService : IDisposable
     private readonly StaTaskRunner _staRunner;
     private readonly RestartHistoryService _historyService;
     private readonly INinaPluginService? _ninaService;
+    private readonly IShellyBleConnector? _bleConnector;
     private SwitchStateCacheService? _switchCacheService;
 
-    public RestartSequenceService(WatchdogConfig config, string? configDirectory = null, INinaPluginService? ninaService = null)
+    public RestartSequenceService(
+        WatchdogConfig config,
+        string? configDirectory = null,
+        INinaPluginService? ninaService = null,
+        IShellyBleConnector? bleConnector = null)
     {
         _config = config;
         _staRunner = new StaTaskRunner();
         var historyDir = configDirectory ?? ConfigService.GetDefaultConfigDirectory();
         _historyService = new RestartHistoryService(historyDir);
         _ninaService = ninaService;
+        _bleConnector = bleConnector;
     }
 
     public void SetSwitchCacheService(SwitchStateCacheService service)
@@ -52,11 +58,31 @@ public sealed class RestartSequenceService : IDisposable
 
     public RestartHistoryService GetHistoryService => _historyService;
 
+    public void ApplyConnectionSettings(WatchdogConfig source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        _config.PlugIp = source.PlugIp;
+        _config.FallbackPlugIp = source.FallbackPlugIp;
+        _config.SwitchId = source.SwitchId;
+        _config.OffSeconds = source.OffSeconds;
+        _config.HttpTimeoutSec = source.HttpTimeoutSec;
+        _config.ShellyBleEnabled = source.ShellyBleEnabled;
+        _config.ShellyBleAddress = source.ShellyBleAddress;
+        _config.ShellyBleExpectedNamePrefix = source.ShellyBleExpectedNamePrefix;
+        _config.ShellyBleDiscoveryTimeoutSec = source.ShellyBleDiscoveryTimeoutSec;
+        _config.ShellyBleConnectTimeoutSec = source.ShellyBleConnectTimeoutSec;
+        _config.ShellyBleResponseTimeoutSec = source.ShellyBleResponseTimeoutSec;
+        _config.AscomRemoteRestartEnabled = source.AscomRemoteRestartEnabled;
+        _config.AscomRemoteBaseUrl = source.AscomRemoteBaseUrl;
+        _config.AscomRemoteDomeDeviceNumber = source.AscomRemoteDomeDeviceNumber;
+        _config.AscomRemoteRestartTimeoutSec = source.AscomRemoteRestartTimeoutSec;
+    }
+
     public async Task<bool> ExecuteAsync(CancellationToken cancellationToken, string? triggerReason = null)
     {
         using var mutex = new Mutex(false, _config.MutexName);
         var acquired = false;
-        var shellyClient = new ShellyClient(TimeSpan.FromSeconds(_config.HttpTimeoutSec));
+        using var shellyClient = new ShellyClient(TimeSpan.FromSeconds(_config.HttpTimeoutSec));
         var logWriter = new RestartLogWriter(_config.RestartLogDirectory);
         var reason = string.IsNullOrWhiteSpace(triggerReason) ? "Watchdog triggered" : triggerReason;
         try
@@ -73,6 +99,15 @@ public sealed class RestartSequenceService : IDisposable
             }
 
             Log(logWriter, "=== RESTART SEQUENCE BEGIN ===");
+            var tcpTransport = CreateTcpTransport(shellyClient, logWriter);
+            using var shellyController = _config.ShellyBleEnabled
+                ? new ShellySwitchController(
+                    tcpTransport,
+                    CreateBleFallback,
+                    message => Log(logWriter, message))
+                : new ShellySwitchController(
+                    tcpTransport,
+                    log: message => Log(logWriter, message));
 
             // Signal Nina that dome reconnection is starting
             if (_ninaService != null)
@@ -85,20 +120,24 @@ public sealed class RestartSequenceService : IDisposable
             Log(logWriter, $"Waiting {_config.PrePowerWaitSec}s...");
             await DelaySeconds(_config.PrePowerWaitSec, cancellationToken);
 
-            var isOn = await shellyClient.GetSwitchOutputAsync(_config.PlugIp, _config.SwitchId, cancellationToken);
-            Log(logWriter, $"Plug state before action: output={isOn}");
+            var state = await shellyController.GetOutputAsync(cancellationToken);
+            var isOn = state.Value;
+            Log(logWriter, $"Plug state before action: output={isOn}; transport={state.Transport}");
 
             if (!isOn)
             {
                 Log(logWriter, "Already OFF -> turning ON only (no cycle)");
-                await shellyClient.SetSwitchAsync(_config.PlugIp, _config.SwitchId, true, cancellationToken);
+                var result = await shellyController.SetOutputAsync(true, cancellationToken);
+                Log(logWriter, $"Plug output=True requested; transport={result.Transport}");
             }
             else
             {
                 Log(logWriter, "Cycling plug: OFF -> wait -> ON");
-                await shellyClient.SetSwitchAsync(_config.PlugIp, _config.SwitchId, false, cancellationToken);
+                var offResult = await shellyController.SetOutputAsync(false, cancellationToken);
+                Log(logWriter, $"Plug output=False requested; transport={offResult.Transport}");
                 await DelaySeconds(_config.OffSeconds, cancellationToken);
-                await shellyClient.SetSwitchAsync(_config.PlugIp, _config.SwitchId, true, cancellationToken);
+                var onResult = await shellyController.SetOutputAsync(true, cancellationToken);
+                Log(logWriter, $"Plug output=True requested; transport={onResult.Transport}");
             }
 
             Log(logWriter, $"Waiting {_config.PostPowerActionWaitSec}s after power action...");
@@ -114,6 +153,7 @@ public sealed class RestartSequenceService : IDisposable
             await DelaySeconds(_config.PostLaunchWaitSec, cancellationToken);
 
             await RunAscomSequenceAsync(logWriter, cancellationToken);
+            await ReloadAscomRemoteAsync(logWriter, cancellationToken);
 
             Log(logWriter, "=== RESTART SEQUENCE END ===");
 
@@ -154,6 +194,74 @@ public sealed class RestartSequenceService : IDisposable
                 try { mutex.ReleaseMutex(); } catch { }
             }
         }
+    }
+
+    private IShellySwitchTransport CreateTcpTransport(
+        ShellyClient shellyClient,
+        RestartLogWriter logWriter)
+    {
+        var transports = _config.GetPlugIpAddresses()
+            .Select(address => new ShellyHttpSwitchTransport(
+                shellyClient,
+                address,
+                _config.SwitchId))
+            .ToList();
+
+        return new ShellyTcpFailoverTransport(
+            transports,
+            message => Log(logWriter, message));
+    }
+
+    private IShellySwitchTransport CreateBleFallback()
+    {
+        if (_bleConnector == null)
+        {
+            throw new InvalidOperationException(
+                "Shelly BLE fallback is enabled, but no BLE connector is available.");
+        }
+
+        return new ShellyBlePlug(
+            _bleConnector,
+            new ShellyBleOptions(
+                _config.ShellyBleAddress,
+                _config.SwitchId,
+                TimeSpan.FromSeconds(_config.ShellyBleDiscoveryTimeoutSec),
+                TimeSpan.FromSeconds(_config.ShellyBleConnectTimeoutSec),
+                TimeSpan.FromSeconds(_config.ShellyBleResponseTimeoutSec),
+                _config.ShellyBleExpectedNamePrefix));
+    }
+
+    private async Task ReloadAscomRemoteAsync(
+        RestartLogWriter logWriter,
+        CancellationToken cancellationToken)
+    {
+        if (!_config.AscomRemoteRestartEnabled)
+        {
+            Log(logWriter, "ASCOM Remote: hosted driver reload is disabled in Watchdog Settings.");
+            return;
+        }
+
+        Log(logWriter, $"ASCOM Remote: reloading hosted drivers at {_config.AscomRemoteBaseUrl}...");
+        using var client = new AscomRemoteClient(
+            _config.AscomRemoteBaseUrl,
+            TimeSpan.FromSeconds(_config.AscomRemoteRestartTimeoutSec));
+
+        await client.ReloadHostedDriversAsync(cancellationToken);
+
+        var connected = await client.GetDomeConnectedAsync(
+            _config.AscomRemoteDomeDeviceNumber,
+            cancellationToken);
+        if (!connected)
+        {
+            throw new InvalidOperationException(
+                $"ASCOM Remote reloaded its hosted drivers, but Alpaca dome device " +
+                $"{_config.AscomRemoteDomeDeviceNumber} is not connected.");
+        }
+
+        Log(
+            logWriter,
+            $"ASCOM Remote: Alpaca dome device {_config.AscomRemoteDomeDeviceNumber} " +
+            "is connected to ASCOM ScopeDome.");
     }
 
     private void StopDomeProcessBestEffort(RestartLogWriter logWriter)
